@@ -1,0 +1,29 @@
+image: alpine/latest
+triggers:
+  - action: email
+    condition: failure
+    to: "<pe@pan.earth>"
+sources:
+# Tracking master, not a tag: a post-v1.40.1 event-loop fix
+# (stream unregistration on producer cancellation) is required
+# and not yet in a tagged release. Same reason as gp.
+- https://git.sr.ht/~bakpakin/janet#master
+- https://github.com/janet-lang/spork.git
+- https://git.sr.ht/~pepe/gp
+- git@git.sr.ht:~pepe/twm
+tasks:
+  - janet: |
+        cd janet
+        make -j
+        sudo make install
+  - spork: |
+        cd spork
+        sudo janet --install .
+  - gp: |
+        cd gp
+        sudo /usr/local/lib/janet/bin/janet-pm deps
+        /usr/local/lib/janet/bin/janet-pm build
+        sudo /usr/local/lib/janet/bin/janet-pm install
+  - twm: |
+        cd twm
+        /usr/local/lib/janet/bin/janet-pm test

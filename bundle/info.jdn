@@ -1,0 +1,9 @@
+{:name "twm"
+ :author "Josef Pospíšil <pe@pan.earth>"
+ :description "Thicket Web Mind - the environment organism grown on gp"
+ :license "MIT"
+ :repo "https://git.sr.ht/~pepe/twm"
+ :url "https://pan.earth/"
+ :jpm-dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
+ :dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
+ :version "0.0.0"}
