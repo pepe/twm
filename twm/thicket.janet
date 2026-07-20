@@ -2,7 +2,7 @@
 
 (defn ^peer/connect
   "Connects to one peer"
-  [peer &opt succ]
+  [peer & succ]
   (make-event
     {:update
      (fn [_ state]
@@ -26,7 +26,7 @@
              [[false _] 10] (produce (log name " cannot connect to " peer "."))
              true)
            (ev/sleep (* (++ tries) 0.1)))
-         (if succ (produce succ))))}
+         (if (present? succ) (produce ;succ))))}
     (. "connect peer " peer)))
 
 (defn ^connect-peer
@@ -107,7 +107,7 @@
     (fn [_ state _]
       (def name ((>or (=<> :guards) (=<> :name)) state))
       (default tenant name)
-      [(log tenant " registers on " peer )
+      [(log tenant " registers on " peer)
        (^session/cap (:register (state peer) name tenant))])
     (. "register " peer)))
 
