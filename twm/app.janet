@@ -495,3 +495,48 @@ dynamics as set by *rpc-defines*.```
   "Replaces \n for <br>"
   [s]
   (string/replace-all "\n" "<br>" s))
+
+(defn ^notify/subscribe
+  "Subscribes a channel for a notification topic."
+  [chan topic]
+  (make-update
+    (def-state _
+      (=> :view :notify topic (>add chan)))
+    (. "subscribe notify " topic)))
+
+(defn ^notify/send-one
+  "Sends one topic notification to a subscribed channel."
+  [chan topic]
+  (make-effect
+    (fn [&]
+      (:give chan topic))
+    (. "send one notify " topic)))
+
+(defn ^notify/clear
+  "Clears all subscriptions for a notification topic."
+  [topic]
+  (make-update
+    (fn [_ {:view {:notify {topic chans}}}]
+      (array/clear chans))
+    (. "clear notify " topic)))
+
+(defn ^notify/send
+  "Sends a topic to all subscribers and clears the subscription queue."
+  [topic]
+  (make-watch
+    (fn [_ {:view {:notify notify}} _]
+      (if-let [chans (notify topic)]
+        [;(seq [chan :in chans]
+            (^notify/send-one chan topic))
+         (^notify/clear topic)]
+        []))
+    (. "send notify " topic)))
+
+(defn produce/wait
+  ```
+  Subscribes `chan`, produces `event`, waits for `topic`, and returns `result`.
+  ```
+  [chan topic event result]
+  (produce (^notify/subscribe chan topic) event)
+  (ev/take chan)
+  result)

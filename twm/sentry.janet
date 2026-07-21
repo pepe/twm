@@ -87,3 +87,116 @@
           (next-middleware req)
           (http/not-authorized not-auth
                                (http/content-type ".html")))))))
+
+(def <form/>
+  "Shared sentry login form."
+  [:form {:method "POST" :class "f-col center"}
+   [:input {:type "password" :name "secret"}]
+   [:button [:strong "Use"]]])
+
+(defn ^prepare-view
+  "Initializes the shared sentry handler view with project templates."
+  [templates]
+  (make-event
+    {:update
+     (fn [_ state]
+       (put state :view
+            (merge
+              (select-keys state [:name :guards :secret :key
+                                  :public :cookie-host :address])
+              @{:cap/session (>base false)
+                :templates templates})))
+     :effect
+     (fn [_ state _]
+       (setdyn :view (state :view)))}
+    "prepare sentry view"))
+
+(defh index
+  "Handles the shared sentry form."
+  [http/cookies]
+  (define :view)
+  (define :conn)
+  (def {:page page :title title :success success} (view :templates))
+  (def {:guards guards :address address} view)
+  (if-let [ck ((view :cap/session) req)]
+    (do
+      (protect
+        (:write conn
+                (http/html-success-resp
+                  (page @[(success guards) (<script/redirect/> address)])))
+        (:flush conn))
+      (ev/give-supervisor :close conn)
+      (produce (^aether/spawn guards ""))
+      (produce Exit)
+      {})
+    (http/html-success-resp
+      (page @[(if (function? title) (title (human guards)) title)
+              <form/>]))))
+
+(defh auth
+  "Authenticates a sentry secret and publishes its session."
+  [http/urlenc-post]
+  (define :view)
+  (define :conn)
+  (def {:page page :success success :failure failure} (view :templates))
+  (if-let [sec (view :secret)
+           bsec (get body :secret "")
+           {:cookie-host cookie-host :key key
+            :guards guards :address address} view
+           _ (pwhash/verify sec bsec key)]
+    (let [sk (derive-from key)]
+      (fn [conn]
+        (def resp
+          (page @[(success guards) (<script/redirect/> address)]))
+        (protect
+          (:write conn
+                  (http/html-success-resp
+                    resp
+                    (http/cookie
+                      "session"
+                      (string sk "; Secure; HttpOnly; Domain="
+                              cookie-host ";"))))
+          (:flush conn))
+        (ev/give-supervisor :close conn)
+        (produce (^session/new sk))
+        (produce (^aether/spawn guards ""))
+        (produce Exit)))
+    (http/html-success-resp (page @[failure <form/>]))))
+
+(defn routes
+  "Builds shared sentry routes; templates may request a fallback route."
+  [templates]
+  (if (get templates :fallback false)
+    @{:not-found (http/dispatch {"GET" index "POST" auth})}
+    @{"/" (http/dispatch {"GET" index "POST" auth})}))
+
+(defn ^assemble
+  "Assembles shared sentry HTTP routes and RPC functions."
+  [templates rpc-funcs]
+  (make-update
+    (fn [_ state]
+      ((=> (>put :routes (routes templates))
+           (>put :static false)
+           (>update :rpc (update-rpc rpc-funcs)))
+        state))
+    "assemble sentry"))
+
+(defn- http-event
+  []
+  HTTP)
+
+(defn- exit-event
+  []
+  Exit)
+
+(defmacro run
+  "Runs the shared sentry lifecycle around project templates and start events."
+  [config templates rpc-funcs start & before]
+  ~(-> ,config
+       (,make-manager ,on-error)
+       (:transact ,;before
+                  (,^prepare-view ,templates)
+                  (,^assemble ,templates ,rpc-funcs)
+                  (,http-event)
+                  (,^connect-peers ,start (,exit-event)))
+       :await))

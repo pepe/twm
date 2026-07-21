@@ -4,6 +4,6 @@
  :license "MIT"
  :repo "https://git.sr.ht/~pepe/twm"
  :url "https://pan.earth/"
- :jpm-dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
- :dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
- :version "0.1.0"}
+ :jpm-dependencies ["spork" "jhydro" "gp"]
+ :dependencies ["spork" "jhydro" "gp"]
+ :version "0.1.1"}
