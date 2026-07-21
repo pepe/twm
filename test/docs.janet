@@ -6,6 +6,7 @@
 (assert-docs "../twm/navigation")
 (assert-docs "../twm/schema")
 (assert-docs "../twm/tree")
+(assert-docs "../twm/symbiont")
 (assert-docs "../twm/dev")
 (assert-docs "../twm/thicket")
 (assert-docs "../twm/sentry")

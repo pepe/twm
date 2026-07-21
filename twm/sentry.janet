@@ -181,22 +181,23 @@
         state))
     "assemble sentry"))
 
-(defn- http-event
-  []
-  HTTP)
-
-(defn- exit-event
-  []
-  Exit)
-
-(defmacro run
+(defn run
   "Runs the shared sentry lifecycle around project templates and start events."
   [config templates rpc-funcs start & before]
-  ~(-> ,config
-       (,make-manager ,on-error)
-       (:transact ,;before
-                  (,^prepare-view ,templates)
-                  (,^assemble ,templates ,rpc-funcs)
-                  (,http-event)
-                  (,^connect-peers ,start (,exit-event)))
-       :await))
+  (-> config
+      (make-manager on-error)
+      (:transact ;before
+                 (^prepare-view templates)
+                 (^assemble templates rpc-funcs)
+                 HTTP
+                 (^connect-peers start Exit))
+      :await))
+
+(defmacro main
+  "Defines a sentry executable entry point around `run`."
+  [config templates rpc-funcs start & before]
+  ~(defn main
+     "Main entry into a sentry executable."
+     [_ & _args]
+     (,run ,config ,templates ,rpc-funcs ,start ,;before)
+     (,os/exit 0)))

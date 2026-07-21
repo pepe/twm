@@ -58,3 +58,20 @@
   "Returns an HTTP cookie capability for the stored session."
   [session]
   (sentry/=>session/?eq session))
+
+(defn run
+  "Runs Tree setup events followed by the shared RPC and readiness lifecycle."
+  [config & setup]
+  (-> config
+      (make-manager on-error)
+      (:transact ;setup RPC Ready)
+      :await))
+
+(defmacro main
+  "Defines a Tree executable entry point around `run`."
+  [config & setup]
+  ~(defn main
+     "Main entry into a Tree executable."
+     [_ & _args]
+     (,run ,config ,;setup)
+     (,os/exit 0)))
