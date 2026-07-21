@@ -501,3 +501,20 @@
     (fn [_ {:host host :data-path dp :name name} _]
       (os/execute ["scp" "-r" (. host ":" dp "/*") dest] :p))
     (. "download to " dest)))
+
+(defn demiurge/run
+  "Runs the Demiurge lifecycle for a sequence of selected events."
+  [initial-state events]
+  (-> initial-state
+      (make-manager on-error)
+      (:transact ;events)
+      :await))
+
+(defmacro demiurge/main
+  "Defines a Demiurge executable entry point with project-specific modes."
+  [initial-state & modes]
+  ~(defn main
+     "Main entry into Demiurge."
+     [_ & mode]
+     (,demiurge/run ,initial-state (match mode ,;modes))
+     (,os/exit 0)))
