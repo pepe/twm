@@ -26,7 +26,6 @@ tasks:
         sudo /usr/local/lib/janet/bin/janet-pm install
   - twm: |
         cd twm
-        sudo /usr/local/lib/janet/bin/janet-pm deps
         /usr/local/lib/janet/bin/janet-pm build
         sudo /usr/local/lib/janet/bin/janet-pm install
         /usr/local/lib/janet/bin/janet-pm test
