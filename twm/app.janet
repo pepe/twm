@@ -193,6 +193,30 @@ dynamics as set by *rpc-defines*.```
       (:flush stdout))
     "write to aether"))
 
+(defn aether/frame
+  "Frames an Aether message with a fixed-width decimal byte length."
+  [msg]
+  (string (string/format "%012d" (length msg)) msg))
+
+(defn- aether/read-exact
+  [stream n]
+  (def bytes @"")
+  (while (< (length bytes) n)
+    (def chunk (:read stream (- n (length bytes))))
+    (when (empty? chunk)
+      (error "Aether stream ended before the framed message was complete"))
+    (buffer/push-string bytes chunk))
+  bytes)
+
+(defn aether/read
+  "Reads one length-framed Aether message from `stream`."
+  [stream]
+  (def header (aether/read-exact stream 12))
+  (def size (scan-number header))
+  (when (or (nil? size) (< size 0))
+    (error "Invalid Aether message length"))
+  (aether/read-exact stream size))
+
 (defn ^aether/spawn
   "Writes the spawn command to stdout"
   [peer arg]

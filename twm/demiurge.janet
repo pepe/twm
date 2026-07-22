@@ -448,14 +448,16 @@
     (. "failed " path)))
 
 (defn ^test/file
-  "Runs one file test and report"
+  "Runs one test file and optionally reports its path and result on `done`."
   [path &opt done]
   (make-watch
     (fn [&]
       (def pass
-        (zero? (os/execute [(dyn *executable* "janet") "--" path] :p)))
-      (if done (ev/give done path))
-      [(^inc :total) (if pass (^inc :passed) (^failed path))])))
+        (zero? (os/execute [(dyn *executable* "janet") "--" path]
+                           :p {:out stderr})))
+      (if done
+        (ev/give done [path pass])
+        [(^inc :total) (if pass (^inc :passed) (^failed path))]))))
 
 (define-event TestReport
   "Reports on the results of the test"
@@ -475,24 +477,43 @@
   (each f (os/dir dp) (os/rm (path/abspath (path/join dp f)))))
 
 (defn ^test
-  "Runs the test"
-  [& files]
+  "Runs test files once and publishes their result over the Aether."
+  [scope & files]
   (make-watch
     (fn [&]
       (producer
-        (let [done (ev/chan)]
-          (produce (logr "\e[2J\e[H\e[30;103m---------- Running Tests ----------\e[0m")
-                   ClearTests)
-          (loop [f :in files
-                 :let [path (string "test/" f)]
-                 :when (string/has-suffix? ".janet" path)]
-            (produce ClearData (^peer/run :tree) (^peer/connect :tree))
-            (ev/sleep 0.2)
-            (produce (logr "\n----- In file " path " -----") (^test/file path done))
-            (ev/take done)
-            (ev/sleep 0.2)
-            (produce (^peer/stop :tree))))
-        (produce TestReport)))))
+        (def done (ev/chan))
+        (def failing @[])
+        (produce
+          (logr "\e[2J\e[H\e[30;103m---------- Running Tests ----------\e[0m")
+          ClearTests)
+        (loop [f :in files
+               :let [path (string "test/" f)]
+               :when (string/has-suffix? ".janet" path)]
+          (produce ClearData (^peer/run :tree) (^peer/connect :tree))
+          (ev/sleep 0.2)
+          (produce (logr "\n----- In file " path " -----") (^test/file path done))
+          (def [_ pass] (ev/take done))
+          (produce (^inc :total) (if pass (^inc :passed) (^failed path)))
+          (if-not pass (array/push failing f))
+          (ev/sleep 0.2)
+          (produce (^peer/stop :tree)))
+        (produce
+          TestReport
+          (^aether
+            (aether/frame
+              (marshal [:test/result {:scope scope :failing failing}])))
+          Stop)))))
+
+(defn ^test/names
+  "Runs one or more named tests, accepting names with or without `.janet`."
+  [& names]
+  (apply ^test :focused
+         (map (fn [name]
+                (if (string/has-suffix? ".janet" name)
+                  name
+                  (. name ".janet")))
+              names)))
 
 (defn ^download
   "Downloads the remote data-path to `dest`"
