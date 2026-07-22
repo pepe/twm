@@ -113,7 +113,11 @@
             (set scope :full)
             (set files baseline))
 
-          (break))
+          (do
+            (eprint "----------- All tests pass; waiting for a source change")
+            (while (not (watch-state :dirty)) (ev/sleep 0.05))
+            (ev/sleep 0.1)
+            (put watch-state :dirty false)))
         (do
           (eprinf "----------- Waiting for a source change; failing tests: %s"
                   (string/join failing ", "))
