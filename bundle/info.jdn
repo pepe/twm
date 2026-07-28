@@ -4,6 +4,10 @@
  :license "MIT"
  :repo "https://git.sr.ht/~pepe/twm"
  :url "https://pan.earth/"
+ # :jpm-dependencies say where to fetch a dependency from, so gp needs its
+ # URL: bare names are resolved against the janet-lang/pkgs listing, which
+ # gp is not in. :dependencies are bundle names that must already be
+ # installed, which bundle/install checks by name.
  :jpm-dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
- :dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
+ :dependencies ["spork" "jhydro" "gp"]
  :version "0.2.1"}
