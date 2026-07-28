@@ -15,17 +15,24 @@
     Empty))
 
 (defn =>sentry/initial-state
-  "Navigation to sentry initial state"
+  ```
+  Navigation to sentry initial state.
+
+  Guarding is inhabiting a membrane. A sentry stands in the guarded
+  symbiont's place on the outside, so it takes that symbiont's membrane
+  and the rpc address it must answer on, and nothing else. Its peers are
+  its own, declared on the sentry: whom a symbiont speaks to is not part
+  of the surface it presents.
+  ```
   [sentry]
   (let [c @[] t @{}
         =>guards (=> :symbionts sentry :guards)]
-    (=> (>if =>guards
+    (=> (<:= t (=>mycelium/peers (=> :symbionts sentry)))
+        (>if =>guards
              (=> (<- c =>guards)
                  (<:- t :tenant (>or (=> :symbionts |(get $ (array/peek c)) :tenant)
                                      (fn [&] (array/peek c))))
-                 (<:= t (=>mycelium/peers
-                          (=> :mycelium :nodes |(get $ (array/peek c)))))
-                 (<:= t (=> :mycelium :nodes |(get $ (array/peek c))))
+                 (<:- t :rpc (=> :mycelium :nodes |(get $ (array/peek c)) :rpc))
                  (<:= t (=> :membrane :nodes |(get $ (array/peek c))))
                  (>if (=> :membrane :nodes |(get $ (array/peek c)))
                       (>if (=> :membrane :nodes |(get $ (array/peek c)) :neighbors)

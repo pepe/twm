@@ -167,13 +167,21 @@
   (keys res))
 
 (defn =>mycelium/node
-  "Navigation to symbiont mycelium"
+  ```
+  Navigation to symbiont mycelium.
+
+  A guardian owns no node. It answers on the address of the symbiont it
+  guards and takes only that: whom it speaks to is its own business,
+  declared on itself, because guarding is inhabiting a surface rather
+  than inheriting every relation behind it.
+  ```
   [symbiont]
   (def c @[])
   (>or (=> :mycelium :nodes symbiont)
        (>when (=> :symbionts symbiont :guards)
               (=> (<- c (=> :symbionts symbiont :guards))
-                  (=> :mycelium :nodes |(get $ (array/pop c)))))))
+                  (=> :mycelium :nodes |(get $ (array/pop c))
+                      |(if $ {:rpc (get $ :rpc)}))))))
 
 (defn =>mycelium/peers
   "Navigation to `symbiont` peers"
