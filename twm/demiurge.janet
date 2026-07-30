@@ -13,6 +13,17 @@
     (spit file conf)
     file))
 
+(defn peer/build-sha-file
+  "Path of the source revision recorded for a built `peer`."
+  [build-path peer]
+  (path/join build-path "_build" "develop"
+             (. (peer/file-name peer) ".sha")))
+
+(defn peer/buildable?
+  "Whether `peer` is explicitly configured as a Demiurge build target."
+  [state peer]
+  (some |(= peer $) (or (state :builds) @[])))
+
 (defn peer/pipe-out
   "Spawns the process with pipe out"
   [state peer cmd flags]
@@ -265,13 +276,27 @@
       (def {:entries entries :name name} state)
       (def [e exep _] (entries peer))
       (def rules @{})
-      (with-dyns [*rules* rules
-                  *build-root* "_build"]
-        (os/setenv "CONF" (peer/spit-conf state peer))
-        (declare-project :name (. name "-" peer))
-        (declare-executable :entry e :name (. (peer/file-name peer)))
-        (build-run rules "build")
-        (os/setenv "CONF" nil)))))
+      (def old-conf (os/getenv "CONF"))
+      (defer (os/setenv "CONF" old-conf)
+        (with-dyns [*rules* rules
+                    *build-root* "_build"]
+          (os/setenv "CONF" (peer/spit-conf state peer))
+          (declare-project :name (. name "-" peer))
+          (declare-executable :entry e :name (. (peer/file-name peer)))
+          (build-run rules "build")
+          (spit (peer/build-sha-file (state :build-path) peer)
+                (string ($<_ git rev-parse HEAD))))))))
+
+(defn ^peer/build-one
+  "Builds one explicitly configured peer, without deploying or restarting it."
+  [peer]
+  (make-watch
+    (fn [_ state _]
+      (if (peer/buildable? state peer)
+        (^peer/build peer)
+        (error (. "Cannot build " peer
+                  "; it is not listed in Demiurge :builds."))))
+    (. "build peer " peer)))
 
 (define-watch Build
   "Builds peers"
