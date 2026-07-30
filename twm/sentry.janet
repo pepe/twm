@@ -55,9 +55,12 @@
     (produce Exit)))
 
 (defh /logout
-  "Handles logout"
+  "Clears the current session; guarded dashboards then hand control back to sentry."
   []
-  (produce (^session/new "") SpawnExit)
+  (define :view)
+  (produce (^session/new ""))
+  (if (view :guarded-by)
+    (produce SpawnExit))
   (http/see-other "/"))
 
 (defn =>session/?eq
@@ -119,11 +122,35 @@
     "prepare sentry view"))
 
 (defh index
-  "Handles the shared sentry form."
+  "Renders the sentry form or an optional dormant-session resume page."
   [http/cookies]
   (define :view)
   (define :conn)
-  (def {:page page :title title :success success} (view :templates))
+  (def {:page page :title title :success success :resume resume} (view :templates))
+  (def {:guards guards :address address} view)
+  (if-let [ck ((view :cap/session) req)]
+    (if resume
+      (http/html-success-resp (page (resume guards)))
+      (do
+        (protect
+          (:write conn
+                  (http/html-success-resp
+                    (page @[(success guards) (<script/redirect/> address)])))
+          (:flush conn))
+        (ev/give-supervisor :close conn)
+        (produce (^aether/spawn guards ""))
+        (produce Exit)
+        {}))
+    (http/html-success-resp
+      (page @[(if (function? title) (title (human guards)) title)
+              <form/>]))))
+
+(defh /continue
+  "Starts the guarded symbiont after a valid dormant sentry session."
+  [http/cookies]
+  (define :view)
+  (define :conn)
+  (def {:page page :success success} (view :templates))
   (def {:guards guards :address address} view)
   (if-let [ck ((view :cap/session) req)]
     (do
@@ -136,9 +163,7 @@
       (produce (^aether/spawn guards ""))
       (produce Exit)
       {})
-    (http/html-success-resp
-      (page @[(if (function? title) (title (human guards)) title)
-              <form/>]))))
+    (http/see-other "/")))
 
 (defh auth
   "Authenticates a sentry secret and publishes its session."
@@ -173,9 +198,12 @@
 (defn routes
   "Builds shared sentry routes; templates may request a fallback route."
   [templates]
-  (if (get templates :fallback false)
-    @{:not-found (http/dispatch {"GET" index "POST" auth})}
-    @{"/" (http/dispatch {"GET" index "POST" auth})}))
+  (merge
+    (if (get templates :fallback false)
+      @{:not-found (http/dispatch {"GET" index "POST" auth})}
+      @{"/" (http/dispatch {"GET" index "POST" auth})})
+    @{"/continue" (http/dispatch {"GET" /continue})
+      "/logout" (http/dispatch {"GET" /logout})}))
 
 (defn ^assemble
   "Assembles shared sentry HTTP routes and RPC functions."
