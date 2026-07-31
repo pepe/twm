@@ -202,7 +202,7 @@ dynamics as set by *rpc-defines*.```
   (def bytes @"")
   (while (< (length bytes) n)
     (def chunk (:read stream (- n (length bytes))))
-    (when (empty? chunk)
+    (when (or (nil? chunk) (empty? chunk))
       (error "Aether stream ended before the framed message was complete"))
     (buffer/push-string bytes chunk))
   bytes)
@@ -210,9 +210,9 @@ dynamics as set by *rpc-defines*.```
 (defn aether/read
   "Reads one version-one framed Aether payload from `stream`."
   [stream]
-  (assert (= aether/magic (aether/read-exact stream (length aether/magic)))
+  (assert (= aether/magic (string (aether/read-exact stream (length aether/magic))))
           "Invalid Aether frame prefix")
-  (def size (scan-number (aether/read-exact stream 12)))
+  (def size (scan-number (string (aether/read-exact stream 12))))
   (assert (and size (<= 0 size aether/max-size))
           "Invalid Aether message length")
   (aether/read-exact stream size))
