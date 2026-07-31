@@ -166,6 +166,37 @@
          true))
   (keys res))
 
+(defn =>guardian/spaces
+  ```
+  Navigation to the living spaces `guardian` inhabits, as the sorted
+  array of symbionts that named it their `:guarded-by`.
+
+  Guarding is declared once, by the symbiont whose place is taken. Read
+  from this side it stays derivable rather than restated, so a guardian
+  can never disagree with a symbiont about who stands in its stead.
+  ```
+  [guardian]
+  (=> :symbionts
+      |(sorted (seq [[symbiont conf] :pairs $
+                     :when (= guardian (get conf :guarded-by))]
+                 symbiont))))
+
+(defn =>guardian/space
+  ```
+  Navigation to the single living space `guardian` inhabits, or nil.
+
+  A symbiont still raises one HTTP and one mycelium server, so it can
+  stand in one place at a time. When those become many, this becomes
+  `=>guardian/spaces` and the assert below is what falls away.
+  ```
+  [guardian]
+  (=> (=>guardian/spaces guardian)
+      |(do
+         (assert (>= 1 (length $))
+                 (string "Guardian " guardian " would inhabit " (length $)
+                         " living spaces, and can hold one."))
+         (first $))))
+
 (defn =>mycelium/node
   ```
   Navigation to symbiont mycelium.
@@ -178,8 +209,8 @@
   [symbiont]
   (def c @[])
   (>or (=> :mycelium :nodes symbiont)
-       (>when (=> :symbionts symbiont :guards)
-              (=> (<- c (=> :symbionts symbiont :guards))
+       (>when (=>guardian/space symbiont)
+              (=> (<- c (=>guardian/space symbiont))
                   (=> :mycelium :nodes |(get $ (array/pop c))
                       |(if $ {:rpc (get $ :rpc)}))))))
 

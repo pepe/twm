@@ -72,8 +72,7 @@
   config/entry?
   config/caps?
   config/tenant?
-  {:guards peer?
-   :secret (?optional present-string?)
+  {:secret (?optional present-string?)
    :key (?optional present-string?)})
 
 (def?! config/command

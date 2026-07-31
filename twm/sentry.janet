@@ -23,13 +23,18 @@
   and the rpc address it must answer on, and nothing else. Its peers are
   its own, declared on the sentry: whom a symbiont speaks to is not part
   of the surface it presents.
+
+  Which symbiont that is comes from `=>guardian/space`, never from the
+  sentry's own config, and is collected here as `:guards` so the state
+  still names the place this sentry stands in.
   ```
   [sentry]
   (let [c @[] t @{}
-        =>guards (=> :symbionts sentry :guards)]
+        =>guards (=>guardian/space sentry)]
     (=> (<:= t (=>mycelium/peers (=> :symbionts sentry)))
         (>if =>guards
              (=> (<- c =>guards)
+                 (<:- t :guards (fn [&] (array/peek c)))
                  (<:- t :tenant (>or (=> :symbionts |(get $ (array/peek c)) :tenant)
                                      (fn [&] (array/peek c))))
                  (<:- t :rpc (=> :mycelium :nodes |(get $ (array/peek c)) :rpc))
