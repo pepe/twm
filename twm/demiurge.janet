@@ -19,6 +19,12 @@
   (path/join build-path "_build" "develop"
              (. (peer/file-name peer) ".sha")))
 
+
+(defn peer/release-sha-file
+  "Path of the source revision recorded for a selectively deployed `peer`."
+  [release-path peer]
+  (path/join release-path (. (peer/file-name peer) ".sha")))
+
 (defn peer/buildable?
   "Whether `peer` is explicitly configured as a Demiurge build target."
   [state peer]
@@ -251,7 +257,7 @@
     view))
 
 (defn ^peer/deploy
-  "Deploys one peer"
+  "Deploys one peer and records the build revision beside its release executable."
   [peer]
   (make-event
     {:watch (log "Deployed peer " peer)
@@ -261,7 +267,42 @@
        (def bexep (executable (path/join bp "_build/develop" pf)))
        (def exep (executable (path/join rp pf)))
        (sh/copy-file bexep exep)
+       (spit (peer/release-sha-file rp peer)
+             (slurp (peer/build-sha-file bp peer)))
        (os/chmod (path/abspath exep) 8r700))}))
+
+(defn ^peer/deploy-one
+  "Deploys one configured peer whose built revision matches the checked-out source."
+  [peer]
+  (make-watch
+    (fn [_ state _]
+      (if-not (peer/buildable? state peer)
+        (error (. "Cannot deploy " peer
+                  "; it is not listed in Demiurge :builds."))
+        (let [bp (state :build-path)
+              pf (peer/file-name peer)
+              artifact (executable (path/join bp "_build/develop" pf))
+              sha-file (peer/build-sha-file bp peer)]
+          (assert (os/stat artifact)
+                  (. "Cannot deploy " peer "; no built executable exists."))
+          (assert (os/stat sha-file)
+                  (. "Cannot deploy " peer "; no build SHA exists."))
+          (assert (= (string/trim (slurp sha-file))
+                     (string ($<_ git rev-parse HEAD)))
+                  (. "Cannot deploy " peer
+                     "; its build SHA does not match the checked-out source."))
+          (^peer/deploy peer))))
+    (. "deploy peer " peer)))
+
+(defn ^peer/release-one
+  "Deploys one configured peer and restarts it only when it was already running."
+  [peer]
+  (make-watch
+    (fn [_ {:view {:spawned spawned}} _]
+      (if (spawned peer)
+        [(^peer/deploy-one peer) (^peer/stop peer) (^peer/run peer)]
+        [(^peer/deploy-one peer)]))
+    (. "release peer " peer)))
 
 (define-watch Deploy
   "Deploys peers"
