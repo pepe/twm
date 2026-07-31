@@ -50,8 +50,8 @@
 
 (defn- test/read-result
   [exit-code aether]
-  (match (protect (unmarshal aether))
-    [true [:test/result result]] result
+  (match (protect aether)
+    [true {:op :result :body result}] result
     [false error & _]
     (error (string "Demiurge test runner exited with " exit-code
                    " and sent an invalid Aether result: " error))
@@ -60,11 +60,10 @@
 
 (defn- test/run
   [args]
-  (def aether @"")
   (def proc
     (os/spawn ["janet" "-d" "demiurge.janet" "test" ;args]
               :p {:out :pipe}))
-  (buffer/push-string aether (aether/read (proc :out)))
+  (def aether (aether/read-message (proc :out)))
   (:close (proc :out))
   (def exit-code (os/proc-wait proc))
   (test/read-result exit-code aether))

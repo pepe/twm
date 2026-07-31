@@ -184,19 +184,18 @@ dynamics as set by *rpc-defines*.```
   "Logs exiting and stops"
   [_ {:name name} _] [(log name " is exiting.") Stop])
 
-(defn ^aether
-  "Writes the spawn command to stdout"
-  [msg]
-  (make-effect
-    (fn [&]
-      (:write stdout msg)
-      (:flush stdout))
-    "write to aether"))
+(def aether/magic
+  "Wire prefix for version-one Aether frames."
+  "AETH01")
+
+(def aether/max-size
+  "Largest accepted Aether payload in bytes."
+  (* 64 1024))
 
 (defn aether/frame
-  "Frames an Aether message with a fixed-width decimal byte length."
-  [msg]
-  (string (string/format "%012d" (length msg)) msg))
+  "Frames an Aether payload with its versioned prefix and fixed-width byte length."
+  [payload]
+  (string aether/magic (string/format "%012d" (length payload)) payload))
 
 (defn- aether/read-exact
   [stream n]
@@ -209,20 +208,51 @@ dynamics as set by *rpc-defines*.```
   bytes)
 
 (defn aether/read
-  "Reads one length-framed Aether message from `stream`."
+  "Reads one version-one framed Aether payload from `stream`."
   [stream]
-  (def header (aether/read-exact stream 12))
-  (def size (scan-number header))
-  (when (or (nil? size) (< size 0))
-    (error "Invalid Aether message length"))
+  (assert (= aether/magic (aether/read-exact stream (length aether/magic)))
+          "Invalid Aether frame prefix")
+  (def size (scan-number (aether/read-exact stream 12)))
+  (assert (and size (<= 0 size aether/max-size))
+          "Invalid Aether message length")
   (aether/read-exact stream size))
 
+(def aether/operations
+  "Version-one Aether operation vocabulary; only ready, spawn, and result are live today."
+  [:ready :spawn :build :deploy :release :result])
+
+(def aether/live-operations
+  "Aether operations with dispatchers in this first migration."
+  [:ready :spawn :result])
+
+(defn aether/message?
+  "Whether `message` is one of the narrow version-one Aether envelopes."
+  [message]
+  (and (dictionary? message)
+       (keyword? (message :op))
+       (index-of (message :op) aether/operations)))
+
+(defn aether/read-message
+  "Reads and validates one marshalled Aether envelope from `stream`."
+  [stream]
+  (def message (unmarshal (aether/read stream)))
+  (assert (aether/message? message) "Invalid Aether message")
+  message)
+
+(defn ^aether
+  "Writes one framed Aether envelope to stdout."
+  [message]
+  (assert (aether/message? message) "Invalid Aether message")
+  (make-effect
+    (fn [&]
+      (:write stdout (aether/frame (marshal message)))
+      (:flush stdout))
+    "write to aether"))
+
 (defn ^aether/spawn
-  "Writes the spawn command to stdout"
+  "Requests the permitted birth of `peer`, optionally carrying its argument."
   [peer arg]
-  (make-watch
-    (^aether (marshal [peer arg]))
-    (. "write spawn of " peer)))
+  (^aether @{:op :spawn :peer peer :arg arg}))
 
 (defn ok-resp
   "RPC MW that returns :ok after the body"
@@ -279,7 +309,7 @@ dynamics as set by *rpc-defines*.```
              Stop])
        :ping (fnr :ping [] :pong)}
       functions))
-  (^rpc url fns psk name deb (^aether "1")))
+  (^rpc url fns psk name deb))
 
 (defn on-error
   "Manages errors for events' manager. Transacts detail logging."
@@ -370,6 +400,11 @@ dynamics as set by *rpc-defines*.```
   "Event that logs readiness"
   [_ {:name name} _]
   (log (human name) " is ready"))
+
+(define-watch AetherReady
+  "Logs readiness and announces it to the supervising Demiurge."
+  [_ _ _]
+  [Ready (^aether @{:op :ready})])
 
 (def project-files-peg
   "PEG for filewatch"

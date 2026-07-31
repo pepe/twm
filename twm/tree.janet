@@ -64,7 +64,7 @@
   [config & setup]
   (-> config
       (make-manager on-error)
-      (:transact ;setup RPC Ready)
+      (:transact ;setup RPC AetherReady)
       :await))
 
 (defmacro main

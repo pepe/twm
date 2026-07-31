@@ -31,13 +31,14 @@
   (some |(= peer $) (or (state :builds) @[])))
 
 (defn peer/pipe-out
-  "Spawns the process with pipe out"
+  "Spawns the process with private Aether stdin and stdout pipes."
   [state peer cmd flags]
   (def fs (keyword flags :e))
   (def env
     (merge (os/environ)
            {"CONF" (peer/spit-conf state peer)
-            :out :pipe}))
+             :in :pipe
+             :out :pipe}))
   (os/spawn cmd fs env))
 
 (defn ^save-sha
@@ -158,39 +159,42 @@
     (. "connect peer " peer)))
 
 (defn ^peer/run
-  "Runs one peer and manages its process lifecycle in one threaded producer"
+  "Runs one peer, reads its Aether while alive, and observes its eventual exit."
   [group &opt peer cmd flags]
   (make-watch
     (fn [_ state _]
       (def {:entries entries} state)
-      (producer
+      (thread-producer
         (default peer group)
         (def [_ _ [ecmd eflags]] (entries peer))
         (default cmd ecmd)
         (default flags eflags)
-        (def ae @"")
         (let [proc (peer/pipe-out state peer cmd flags)]
           (produce (^peer/save-spawned group :boot))
-          (ev/read (proc :out) 1 ae)
-          (when (= (. ae) "1")
-            (produce
-              (^peer/connect group
-                             (^peer/save-spawned group :mycelium))))
-          (buffer/clear ae)
+          (forever
+            (match (protect (aether/read-message (proc :out)))
+              [true {:op :ready}]
+              (produce (^peer/connect group (^peer/save-spawned group :mycelium)))
+              [true {:op :spawn :peer target :arg arg}]
+              (let [source ((state :nav/symbiont) group (state :config))
+                    allowed @[(source :guards) (source :guarded-by)]]
+                (assert (and (keyword? target) (string? arg) (index-of target allowed))
+                        (. "Aether spawn from " group " is not permitted."))
+                (if-not (get-in state [:view :spawned target])
+                  (let [[_ _ [next-cmd next-flags]] (entries target)]
+                    (produce (^peer/run target target [;next-cmd arg] next-flags)))))
+              [true {:op :result}]
+              (produce (log "Aether result from " group))
+              [true {:op op}]
+              (produce (log "Aether operation " op " from " group " is reserved."))
+              [false _] (break)))
           (def exit-code (os/proc-wait proc))
           (produce
             (if (zero? exit-code)
               (log (or peer group) " exited with success")
-              (log (or peer group) " exited with code " exit-code)))
-          (ev/read (proc :out) 128 ae) # aether has limit
-          (produce (^peer/remove group)))
-        (if-not (empty? ae)
-          (let [[p next-arg] (unmarshal (string/replace-all "\r" "" ae))
-                [_ _ [cmd flags]] (entries p)]
-            (produce (log group " occupation continues with " p))
-            (produce (^peer/run group p [;cmd next-arg] flags))))))
+              (log (or peer group) " exited with code " exit-code))
+            (^peer/remove group)))))
     (. "run peer " peer)))
-
 (define-event RunPeers
   "Runs peers event"
   {:update
@@ -566,9 +570,7 @@
           (produce (^peer/stop :tree)))
         (produce
           TestReport
-          (^aether
-            (aether/frame
-              (marshal [:test/result {:scope scope :failing failing}])))
+          (^aether @{:op :result :body {:scope scope :failing failing}})
           Stop)))))
 
 (defn ^test/names
