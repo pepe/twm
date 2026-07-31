@@ -172,46 +172,59 @@ dynamics as set by *rpc-defines*.```
   [state]
   (or (state :spaces) [state]))
 
+(defn space/held
+  "The addresses `space` currently holds, keyed by kind."
+  [space]
+  (or (space :held)
+      (let [held @{}] (put space :held held) held)))
+
 (defn space/listen
   ```
-  Opens the listener of `space` on its own address, keeping it and its
-  accepting fiber on the space so the space can be given up again.
+  Opens one of `space`'s addresses, of `kind`, on `url`, feeding `chan`.
+
+  What it takes is kept on the space: the listener to close, the fiber
+  accepting on it to cancel, and the channel and address to open it again.
+  A space is every address it answers on, so giving one up means giving
+  up all of them, and a symbiont that kept only its membrane would go on
+  holding the mycelium address the rising symbiont needs.
   ```
-  [space]
-  (def [accepting listener]
-    (server/start (space :chan) ;(server/host-port (space :http))))
-  (put space :accepting accepting)
-  (put space :listener listener)
+  [space kind chan url]
+  (def [accepting listener] (server/start chan ;(server/host-port url)))
+  (put (space/held space) kind
+       @{:accepting accepting :listener listener :chan chan :url url})
   space)
 
 (defn ^space/vacate
   ```
-  Event giving up the address of one living `space`, without disturbing
+  Event giving up every address of one living `space`, without disturbing
   the other spaces or the symbiont that holds them.
 
-  Only the listener goes. The supervisor stays parked on the space's
-  channel and the symbiont keeps its peers, its registration and its
-  session, so the place can be taken back with `^space/resume` and
-  nothing has to be introduced to the thicket a second time.
+  Only the listeners go. The supervisors stay parked on their channels and
+  the symbiont keeps its peers, its registration and its session, so the
+  place can be taken back with `^space/resume` and nothing has to be
+  introduced to the thicket a second time.
   ```
   [space]
   (make-effect
     (fn [&]
-      (when-let [accepting (space :accepting)]
-        (protect (ev/cancel accepting "vacated")))
-      (when-let [listener (space :listener)]
-        (protect (:close listener)))
-      (put space :accepting nil)
-      (put space :listener nil))
-    (. "vacate " (space :http))))
+      (each held (values (space/held space))
+        (when-let [accepting (held :accepting)]
+          (protect (ev/cancel accepting "vacated")))
+        (when-let [listener (held :listener)]
+          (protect (:close listener)))
+        (put held :accepting nil)
+        (put held :listener nil)))
+    (. "vacate " (space :name))))
 
 (defn ^space/resume
-  "Event taking back the address of one living `space`."
+  "Event taking back every address of one living `space`."
   [space]
   (make-effect
     (fn [&]
-      (unless (space :listener) (space/listen space)))
-    (. "resume " (space :http))))
+      (each [kind held] (pairs (space/held space))
+        (unless (held :listener)
+          (space/listen space kind (held :chan) (held :url)))))
+    (. "resume " (space :name))))
 
 (defn ^space/http
   ```
@@ -237,8 +250,7 @@ dynamics as set by *rpc-defines*.```
     (producer
       (space/dwell view)
       (def chan (ev/chan 128))
-      (put space :chan chan)
-      (space/listen space)
+      (space/listen space :http chan http)
       (produce (logf "Starting %s HTTP server on %s, port %s" name ;(server/host-port http)))
       (http/supervisor
         chan
@@ -356,8 +368,13 @@ dynamics as set by *rpc-defines*.```
     (produce ;(handler ;args))))
 
 (defn ^rpc
-  "Constructs producer with running rpc server"
-  [url functions psk name deb &opt view after-start]
+  ```
+  Constructs producer with running rpc server.
+
+  Given the living `space` it answers for, it dwells in that space's view
+  and hands it the address to hold, so the space can be given up whole.
+  ```
+  [url functions psk name deb &opt space after-start]
   (assert (present-string? url) "RPC host and port must be set, exiting.")
   (assert (present-string? psk) "RPC psk must be set, exiting.")
   (default functions {})
@@ -366,10 +383,12 @@ dynamics as set by *rpc-defines*.```
   (make-watch
     (producer
       (setdyn :debug deb)
-      (space/dwell view)
+      (when space (space/dwell (space :view)))
       (let [[host port] (server/host-port url)
             chan (ev/chan 128)]
-        (server/start chan host port)
+        (if space
+          (space/listen space :rpc chan url)
+          (server/start chan host port))
         (produce (logf "Starting %s RPC on %s, port %s" name
                        ;(server/host-port url))
                  after-start)
@@ -377,20 +396,15 @@ dynamics as set by *rpc-defines*.```
           chan
           (rpc/on-connection
             (merge-into @{:psk psk} functions))
-          [:product events] (produce ;events)
-          [:error fiber]
-          (do
-            (def err (fiber/last-value fiber))
-            (def conn ((fiber/getenv fiber) :conn))
-            (produce (log "RPC Supervisor: " err))
-            (when (dyn :debug) (produce (stacktrace fiber)))
-            (:close conn)))))
+          # rpc/supervisor puts its own [:error fiber] rule ahead of these,
+          # so a rule for it here would never be reached.
+          [:product events] (produce ;events))))
     (. "rpc " url)))
 
 (defn ^space/rpc
   "Event running the mycelium server of one living `space`."
   [space psk deb]
-  (def {:rpc {:url url :functions functions} :name name :view view} space)
+  (def {:rpc {:url url :functions functions} :name name} space)
   (def fns
     (merge
       {:stop
@@ -399,7 +413,7 @@ dynamics as set by *rpc-defines*.```
              Stop])
        :ping (fnr :ping [] :pong)}
       functions))
-  (^rpc url fns psk name deb view))
+  (^rpc url fns psk name deb space))
 
 (define-watch RPC
   "Creates a producer with a running RPC server for every living space."
