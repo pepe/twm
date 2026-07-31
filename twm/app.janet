@@ -143,37 +143,82 @@ dynamics as set by *rpc-defines*.```
     (ev/sleep 0.001)
     (exit)))
 
-(define-watch HTTP
-  "Creates producer with running HTTP server."
-  [_ {:http http :log log? :debug deb :name name
-      :routes routes :public public :static static} _]
+(defn space/inhabit
+  ```
+  Gives the current fiber an environment of its own, layered over the one
+  it inherited, and binds `view` in it.
+
+  A producer is a `coro`, and a `coro` inherits its parent's environment
+  by reference: a plain `setdyn` inside one reaches every sibling producer
+  and the parent besides. Layering keeps a space's view to itself, while
+  everything else the fiber inherited still resolves through the
+  prototype, and every connection the server accepts inherits it in turn.
+  ```
+  [view]
+  (when view
+    (def fiber (fiber/current))
+    (fiber/setenv fiber (table/setproto @{:view view} (fiber/getenv fiber)))))
+
+(defn spaces
+  ```
+  The living spaces a symbiont raises.
+
+  A symbiont that declares none raises its own, described by the state
+  itself, which is how every symbiont holding a single membrane reads.
+  A symbiont standing in several places declares one space each, and a
+  space describes itself with the same keys the state would: `:http`,
+  `:rpc`, `:routes`, `:public`, `:static`, `:name`, `:log` and `:view`.
+  ```
+  [state]
+  (or (state :spaces) [state]))
+
+(defn ^space/http
+  ```
+  Producer running the HTTP server of one living `space`.
+
+  The space's view is bound inside the producer rather than around it,
+  because a dynamic binding belongs to the fiber that makes it and is
+  inherited by every connection the server accepts. That is what lets
+  one symbiont hold several spaces without their views meeting.
+  ```
+  [space]
+  (def {:http http :log log? :name name :view view
+        :routes routes :public public :static static} space)
   (assert http "HTTP host and port must be set, exiting.")
   (assert (table? routes) "Routes must be table, exiting.")
   (if static (assert public "Public path must be set, exiting."))
-  (setdyn :debug deb)
   (def parser
     (http/parser
       (cond-> routes
               static (put :not-found (http/static public))
               true http/drive log? event-journal)))
-  (producer
-    (def chan (ev/chan 128))
-    (server/start chan ;(server/host-port http))
-    (produce (logf "Starting %s HTTP server on %s, port %s" name ;(server/host-port http)))
-    (http/supervisor
-      chan
-      (http/on-connection parser)
-      [:product events] (produce ;events)
-      [:error fiber]
-      (with [conn ((fiber/getenv fiber) :conn)]
-        (when conn
-          (def err (fiber/last-value fiber))
-          (eprint name " HTTP Supervisor: " err)
-          (when (dyn :debug) (debug/stacktrace fiber))
-          (protect
-            (:write conn
-                    (http/internal-server-error
-                      (string "Internal Server Error: " err)))))))))
+  (make-watch
+    (producer
+      (space/inhabit view)
+      (def chan (ev/chan 128))
+      (server/start chan ;(server/host-port http))
+      (produce (logf "Starting %s HTTP server on %s, port %s" name ;(server/host-port http)))
+      (http/supervisor
+        chan
+        (http/on-connection parser)
+        [:product events] (produce ;events)
+        [:error fiber]
+        (with [conn ((fiber/getenv fiber) :conn)]
+          (when conn
+            (def err (fiber/last-value fiber))
+            (eprint name " HTTP Supervisor: " err)
+            (when (dyn :debug) (debug/stacktrace fiber))
+            (protect
+              (:write conn
+                      (http/internal-server-error
+                        (string "Internal Server Error: " err))))))))
+    (. "http " http)))
+
+(define-watch HTTP
+  "Creates a producer with a running HTTP server for every living space."
+  [_ state _]
+  (setdyn :debug (state :debug))
+  (seq [space :in (spaces state)] (^space/http space)))
 
 (defn ^delay
   "Delay the `event` for `s` time"
@@ -269,7 +314,7 @@ dynamics as set by *rpc-defines*.```
 
 (defn ^rpc
   "Constructs producer with running rpc server"
-  [url functions psk name deb &opt after-start]
+  [url functions psk name deb &opt after-start view]
   (assert (present-string? url) "RPC host and port must be set, exiting.")
   (assert (present-string? psk) "RPC psk must be set, exiting.")
   (default functions {})
@@ -278,6 +323,7 @@ dynamics as set by *rpc-defines*.```
   (make-watch
     (producer
       (setdyn :debug deb)
+      (space/inhabit view)
       (let [[host port] (server/host-port url)
             chan (ev/chan 128)]
         (server/start chan host port)
@@ -298,9 +344,10 @@ dynamics as set by *rpc-defines*.```
             (:close conn)))))
     (. "rpc " url)))
 
-(define-watch RPC
-  "Creates producer with running RPC server."
-  [_ {:rpc {:url url :functions functions} :psk psk :name name :debug deb} _]
+(defn ^space/rpc
+  "Event running the mycelium server of one living `space`."
+  [space psk deb]
+  (def {:rpc {:url url :functions functions} :name name :view view} space)
   (def fns
     (merge
       {:stop
@@ -309,7 +356,13 @@ dynamics as set by *rpc-defines*.```
              Stop])
        :ping (fnr :ping [] :pong)}
       functions))
-  (^rpc url fns psk name deb))
+  (^rpc url fns psk name deb nil view))
+
+(define-watch RPC
+  "Creates a producer with a running RPC server for every living space."
+  [_ state _]
+  (def {:psk psk :debug deb} state)
+  (seq [space :in (spaces state)] (^space/rpc space psk deb)))
 
 (defn on-error
   "Manages errors for events' manager. Transacts detail logging."
