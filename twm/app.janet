@@ -143,7 +143,7 @@ dynamics as set by *rpc-defines*.```
     (ev/sleep 0.001)
     (exit)))
 
-(defn space/inhabit
+(defn space/dwell
   ```
   Gives the current fiber an environment of its own, layered over the one
   it inherited, and binds `view` in it.
@@ -235,7 +235,7 @@ dynamics as set by *rpc-defines*.```
               true http/drive log? event-journal)))
   (make-watch
     (producer
-      (space/inhabit view)
+      (space/dwell view)
       (def chan (ev/chan 128))
       (put space :chan chan)
       (space/listen space)
@@ -313,10 +313,6 @@ dynamics as set by *rpc-defines*.```
   "Version-one Aether operation vocabulary; only ready, spawn, and result are live today."
   [:ready :spawn :build :deploy :release :result])
 
-(def aether/live-operations
-  "Aether operations with dispatchers in this first migration."
-  [:ready :spawn :result])
-
 (defn aether/message?
   "Whether `message` is one of the narrow version-one Aether envelopes."
   [message]
@@ -361,7 +357,7 @@ dynamics as set by *rpc-defines*.```
 
 (defn ^rpc
   "Constructs producer with running rpc server"
-  [url functions psk name deb &opt after-start view]
+  [url functions psk name deb &opt view after-start]
   (assert (present-string? url) "RPC host and port must be set, exiting.")
   (assert (present-string? psk) "RPC psk must be set, exiting.")
   (default functions {})
@@ -370,7 +366,7 @@ dynamics as set by *rpc-defines*.```
   (make-watch
     (producer
       (setdyn :debug deb)
-      (space/inhabit view)
+      (space/dwell view)
       (let [[host port] (server/host-port url)
             chan (ev/chan 128)]
         (server/start chan host port)
@@ -403,7 +399,7 @@ dynamics as set by *rpc-defines*.```
              Stop])
        :ping (fnr :ping [] :pong)}
       functions))
-  (^rpc url fns psk name deb nil view))
+  (^rpc url fns psk name deb view))
 
 (define-watch RPC
   "Creates a producer with a running RPC server for every living space."

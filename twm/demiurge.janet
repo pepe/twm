@@ -31,7 +31,14 @@
   (some |(= peer $) (or (state :builds) @[])))
 
 (defn peer/pipe-out
-  "Spawns the process with private Aether stdin and stdout pipes."
+  ```
+  Spawns the peer process with its stdout piped, which is the Aether the
+  demiurge reads it on.
+
+  Its stdin is piped too and never written to. That is a closed door, not
+  an unfinished one: peers run under `janet -d`, and a debugger inheriting
+  the terminal would take the keystrokes meant for the demiurge.
+  ```
   [state peer cmd flags]
   (def fs (keyword flags :e))
   (def env
@@ -162,10 +169,10 @@
   ```
   Runs one peer, reads its Aether while alive, and observes its eventual exit.
 
-  With `once`, the peer is run only when it is not spawned already. The check
-  belongs here because this function is the last place before the birth that
-  still sees the live `:spawned`; a peer reading its Aether sees only the
-  marshalled copy its thread was born with.
+  With `once`, the peer is run only when it is not spawned already. The
+  check belongs here because this is the last place before the birth that
+  still reads the live `:spawned`; the Aether asks from inside a thread,
+  which sees only the marshalled copy its thread was born with.
   ```
   [group &opt peer cmd flags once]
   (make-watch
@@ -190,7 +197,7 @@
                           (. "Aether spawn from " group " is not permitted."))
                   (let [[_ _ [next-cmd next-flags]] (entries target)]
                     (produce (^peer/run target target [;next-cmd arg]
-                                        next-flags true))))
+                                        next-flags :once))))
                 [true {:op :result}]
                 (produce (log "Aether result from " group))
                 [true {:op op}]
@@ -206,6 +213,7 @@
                 (log (or peer group) " exited with code " exit-code))
               (^peer/remove group))))))
     (. "run peer " peer)))
+
 (define-event RunPeers
   "Runs peers event"
   {:update
