@@ -172,6 +172,47 @@ dynamics as set by *rpc-defines*.```
   [state]
   (or (state :spaces) [state]))
 
+(defn space/listen
+  ```
+  Opens the listener of `space` on its own address, keeping it and its
+  accepting fiber on the space so the space can be given up again.
+  ```
+  [space]
+  (def [accepting listener]
+    (server/start (space :chan) ;(server/host-port (space :http))))
+  (put space :accepting accepting)
+  (put space :listener listener)
+  space)
+
+(defn ^space/vacate
+  ```
+  Event giving up the address of one living `space`, without disturbing
+  the other spaces or the symbiont that holds them.
+
+  Only the listener goes. The supervisor stays parked on the space's
+  channel and the symbiont keeps its peers, its registration and its
+  session, so the place can be taken back with `^space/resume` and
+  nothing has to be introduced to the thicket a second time.
+  ```
+  [space]
+  (make-effect
+    (fn [&]
+      (when-let [accepting (space :accepting)]
+        (protect (ev/cancel accepting "vacated")))
+      (when-let [listener (space :listener)]
+        (protect (:close listener)))
+      (put space :accepting nil)
+      (put space :listener nil))
+    (. "vacate " (space :http))))
+
+(defn ^space/resume
+  "Event taking back the address of one living `space`."
+  [space]
+  (make-effect
+    (fn [&]
+      (unless (space :listener) (space/listen space)))
+    (. "resume " (space :http))))
+
 (defn ^space/http
   ```
   Producer running the HTTP server of one living `space`.
@@ -196,22 +237,28 @@ dynamics as set by *rpc-defines*.```
     (producer
       (space/inhabit view)
       (def chan (ev/chan 128))
-      (server/start chan ;(server/host-port http))
+      (put space :chan chan)
+      (space/listen space)
       (produce (logf "Starting %s HTTP server on %s, port %s" name ;(server/host-port http)))
       (http/supervisor
         chan
         (http/on-connection parser)
         [:product events] (produce ;events)
         [:error fiber]
-        (with [conn ((fiber/getenv fiber) :conn)]
-          (when conn
+        # A fiber can fail with no connection to answer on: the accepting
+        # fiber does exactly that when the space is vacated. Only a failure
+        # that has someone waiting on it is worth a reply.
+        (if-let [conn (get (fiber/getenv fiber) :conn)]
+          (with [conn conn]
             (def err (fiber/last-value fiber))
             (eprint name " HTTP Supervisor: " err)
             (when (dyn :debug) (debug/stacktrace fiber))
             (protect
               (:write conn
                       (http/internal-server-error
-                        (string "Internal Server Error: " err))))))))
+                        (string "Internal Server Error: " err)))))
+          (when (dyn :debug)
+            (eprint name " HTTP Supervisor: " (fiber/last-value fiber))))))
     (. "http " http)))
 
 (define-watch HTTP
