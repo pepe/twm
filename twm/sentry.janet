@@ -196,7 +196,8 @@
        (defn view/of [place]
          (merge (select-keys state [:name :secret :key])
                 (select-keys place [:guards :public :cookie-host :address :tenant])
-                @{:cap/session cap :templates templates :tenant/address home}))
+                @{:cap/session cap :templates templates :tenant/address home
+                  :space place}))
        (each space (values (get state :spaces {}))
          (merge-into space (select-keys state [:log :debug]))
          (put space :view (view/of space)))
@@ -217,6 +218,7 @@
     (if resume
       (http/html-success-resp (page (resume guards)))
       (do
+        (if-let [space (view :space)] (space/let-go space))
         (protect
           (:write conn
                   (http/html-success-resp
@@ -238,6 +240,7 @@
   (def {:guards guards :address address} view)
   (if-let [ck ((view :cap/session) req)]
     (do
+      (if-let [space (view :space)] (space/let-go space))
       (protect
         (:write conn
                 (http/html-success-resp
@@ -261,6 +264,7 @@
            _ (pwhash/verify sec bsec key)]
     (let [sk (derive-from key)]
       (fn [conn]
+        (if-let [space (view :space)] (space/let-go space))
         (def resp
           (page @[(success guards) (<script/redirect/> address)]))
         (protect
@@ -290,6 +294,7 @@
   (def {:guards guards :address address :tenant/address home} view)
   (if-let [ck ((view :cap/session) req)]
     (do
+      (if-let [space (view :space)] (space/let-go space))
       (protect
         (:write conn
                 (http/html-success-resp

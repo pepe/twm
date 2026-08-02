@@ -209,6 +209,24 @@ dynamics as set by *rpc-defines*.```
        @{:listener listener :chan chan :url url})
   space)
 
+(defn space/let-go
+  ```
+  Closes every address `space` holds, at once and here rather than as an
+  event.
+
+  A handler that hands its place over answers the request that asked for
+  it, and that answer sends the asker straight back to the door. Letting
+  go as an event leaves the door open across the reply, and the asker can
+  return through it before the guardian has stepped aside. Established
+  connections outlive their listener, so the reply still arrives.
+  ```
+  [space]
+  (each held (values (space/held space))
+    (when-let [listener (held :listener)]
+      (protect (:close listener)))
+    (put held :listener nil))
+  space)
+
 (defn ^space/vacate
   ```
   Event giving up every address of one living `space`, without disturbing
@@ -220,13 +238,7 @@ dynamics as set by *rpc-defines*.```
   introduced to the thicket a second time.
   ```
   [space]
-  (make-effect
-    (fn [&]
-      (each held (values (space/held space))
-        (when-let [listener (held :listener)]
-          (protect (:close listener)))
-        (put held :listener nil)))
-    (. "vacate " (space :name))))
+  (make-effect (fn [&] (space/let-go space)) (. "vacate " (space :name))))
 
 (defn ^space/resume
   "Event taking back every address of one living `space`."
