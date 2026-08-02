@@ -109,12 +109,20 @@
     "save session"))
 
 (defn ^tenant/register
-  "Registers for refresh"
+  ```
+  Registers for whatever `peer` pushes on behalf of `tenant`.
+
+  A symbiont registers under its own name, never under the name of a place
+  it happens to be standing in. A guardian hands such a place over the
+  moment the symbiont it guards rises, and a registration pointing there
+  would be answered by the risen symbiont from then on -- the guardian
+  would keep serving on a capability nobody could tell it had expired.
+  ```
   [peer &opt tenant]
   (make-watch
     (fn [_ state _]
-      (def name ((>or (=<> :guards) (=<> :name)) state))
-      (default tenant name)
+      (def {:name name} state)
+      (default tenant ((>or (=<> :guards) (=<> :name)) state))
       [(log tenant " registers on " peer)
        (^session/cap (:register (state peer) name tenant))])
     (. "register " peer)))
