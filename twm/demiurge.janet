@@ -177,10 +177,17 @@
            (while
              (match [(protect (:open (state peer))) tries]
                [[true _] _] (produce (log name " connected to " peer))
-               [[false _] 10] (produce (log name " cannot connect to " peer "."))
+               [[false _] 10]
+               (do
+                 (set failed true)
+                 (produce (log name " cannot connect to " peer ".")))
                true)
              (ev/sleep (* (++ tries) 0.1))))
-         (if succ (produce succ))))}
+         # A peer that could not be reached has not reached the mycelium,
+         # whatever it says of itself. Calling it arrived would put it in
+         # the heartbeat's care, which would find it unreachable, miss it
+         # three times and restart a peer that was never unwell.
+         (if (and succ (not failed)) (produce succ))))}
     (. "connect peer " peer)))
 
 (defn ^peer/run
