@@ -216,7 +216,8 @@
               (produce (^peer/connect group (^peer/save-spawned group :mycelium)))
               [true {:op :spawn :peer target :arg arg}]
               (let [source (((state :nav/symbiont) group) (state :config))
-                    allowed @[(source :guards) (source :guarded-by)]]
+                    allowed @[;(keys (get source :spaces {}))
+                              (source :guarded-by)]]
                 (assert (and (keyword? target) (string? arg) (index-of target allowed))
                         (. "Aether spawn from " group " is not permitted."))
                 (if-not (get-in state [:view :spawned target])

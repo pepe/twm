@@ -36,43 +36,37 @@
   its own, declared on the sentry: whom a symbiont speaks to is not part
   of the surface it presents.
 
-  Which symbiont that is comes from `=>guardian/space`, never from the
-  sentry's own config, and is collected here as `:guards` so the state
-  still names the place this sentry stands in.
-
-  The address it answers on for the guarded symbiont goes into `:spaces`,
-  not over its own `:rpc`. A guardian that outlives the handover has to be
-  reachable as itself while it stands in another's place, and one address
-  cannot name two living symbionts.
+  Which symbionts those are comes from `=>guardian/spaces`, never from the
+  guardian's own config. Each becomes a living space it holds and can give
+  up again; its own address and its own peers stay its own, because a
+  guardian that outlives a handover must be reachable as itself while it
+  stands in another's place.
   ```
   [sentry]
-  (let [c @[] t @{} spaces @{}
-        =>guards (=>guardian/space sentry)]
+  (let [t @{} spaces @{}]
     (=> (<:= t (=>mycelium/peers (=> :symbionts sentry)))
-        (>if =>guards
-             (=> (<- c =>guards)
-                 (<:- t :guards (fn [&] (array/peek c)))
-                 (<:- t :tenant (>or (=> :symbionts |(get $ (array/peek c)) :tenant)
-                                     (fn [&] (array/peek c))))
-                 (fn [config]
-                   # A guardian with no address of its own is not standing
-                   # in another's place, it is living there: the membrane
-                   # is simply its own. Declare it a mycelium node and it
-                   # becomes a symbiont that inhabits, holding that place
-                   # as a space it can give up again.
-                   (def guarded (array/peek c))
-                   (def surface (guarded/surface config guarded))
-                   (if (get-in config [:mycelium :nodes sentry :rpc])
-                     (put spaces guarded
-                          (merge surface
-                                 @{:name guarded
-                                   :guards guarded
-                                   :tenant (t :tenant)
-                                   :rpc (get-in config
-                                                [:mycelium :nodes guarded :rpc])}))
-                     (merge-into t surface))
-                   config)
-                 (<:- t :spaces (fn [&] spaces))))
+        (fn [config]
+          (each guarded ((=>guardian/spaces sentry) config)
+            (put spaces guarded
+                 (merge (guarded/surface config guarded)
+                        @{:name guarded
+                          :guards guarded
+                          :tenant (or (get-in config [:symbionts guarded :tenant])
+                                      guarded)
+                          :rpc (get-in config
+                                       [:mycelium :nodes guarded :rpc])})))
+          config)
+        (<:- t :spaces (fn [&] spaces))
+        (fn [config]
+          # A guardian registers for one tenant, so the places it holds
+          # must belong to one. Guarding across tenants is a shape nobody
+          # has needed; it should be said out loud before it is allowed.
+          (def tenants (distinct (map |($ :tenant) (values spaces))))
+          (assert (>= 1 (length tenants))
+                  (string "Guardian " sentry " would stand in places of "
+                          (length tenants) " tenants, and registers for one."))
+          (if-let [tenant (first tenants)] (put t :tenant tenant))
+          config)
         (>base t))))
 
 (defn ^place/leave
@@ -182,10 +176,16 @@
        # One capability, held by every view. It belongs to the tenant, not
        # to any one of its places, so a single push must reach them all.
        (def cap (>base false))
+       # Where a session is granted for this tenant: the place the guardian
+       # holds for the tenant's own symbiont. The other places send anyone
+       # without a session there, and have no other way to know of it.
+       (def home
+         (some |(if (= ($ :guards) ($ :tenant)) ($ :address))
+               (values (get state :spaces {}))))
        (defn view/of [place]
          (merge (select-keys state [:name :secret :key])
                 (select-keys place [:guards :public :cookie-host :address :tenant])
-                @{:cap/session cap :templates templates}))
+                @{:cap/session cap :templates templates :tenant/address home}))
        (each space (values (get state :spaces {}))
          (merge-into space (select-keys state [:log :debug]))
          (put space :view (view/of space)))
@@ -266,15 +266,47 @@
         (produce (^aether/spawn guards "") (^place/leave guards))))
     (http/html-success-resp (page @[failure <form/>]))))
 
+(defh inhabited
+  ```
+  Serves a place the guardian holds for a symbiont other than the tenant's
+  own. There is no secret to offer here: the session is granted at the
+  tenant's door, and this door only asks whether it was.
+  ```
+  [http/cookies]
+  (define :view)
+  (define :conn)
+  (def {:page page :success success :unauthorized unauthorized} (view :templates))
+  (def {:guards guards :address address :tenant/address home} view)
+  (if-let [ck ((view :cap/session) req)]
+    (do
+      (protect
+        (:write conn
+                (http/html-success-resp
+                  (page @[(success guards) (<script/redirect/> address)])))
+        (:flush conn))
+      (ev/give-supervisor :close conn)
+      (produce (^aether/spawn guards "") (^place/leave guards))
+      {})
+    (http/not-authorized (unauthorized guards home)
+                         (http/content-type ".html"))))
+
 (defn routes
-  "Builds shared sentry routes; templates may request a fallback route."
-  [templates]
-  (merge
-    (if (get templates :fallback false)
-      @{:not-found (http/dispatch {"GET" index "POST" auth})}
-      @{"/" (http/dispatch {"GET" index "POST" auth})})
-    @{"/continue" (http/dispatch {"GET" /continue})
-      "/logout" (http/dispatch {"GET" /logout})}))
+  ```
+  Builds the routes of one living space.
+
+  The tenant's own place is where a session is granted, and it alone
+  carries the form, the resume and the logout. Every other place the
+  guardian holds asks only whether that grant happened.
+  ```
+  [templates place]
+  (if (not= (place :guards) (place :tenant))
+    @{"/" (http/dispatch {"GET" inhabited})}
+    (merge
+      (if (get templates :fallback false)
+        @{:not-found (http/dispatch {"GET" index "POST" auth})}
+        @{"/" (http/dispatch {"GET" index "POST" auth})})
+      @{"/continue" (http/dispatch {"GET" /continue})
+        "/logout" (http/dispatch {"GET" /logout})})))
 
 (defn ^assemble
   ```
@@ -289,9 +321,10 @@
   (make-update
     (fn [_ state]
       (each place [state ;(values (get state :spaces {}))]
-        (update place :rpc (update-rpc (merge rpc/guardian rpc-funcs)))
-        (put place :routes (routes templates))
-        (put place :static false))
+        (update place :rpc (update-rpc (merge rpc/guardian rpc-funcs))))
+      (each space (values (get state :spaces {}))
+        (put space :routes (routes templates space))
+        (put space :static false))
       state)
     "assemble sentry"))
 

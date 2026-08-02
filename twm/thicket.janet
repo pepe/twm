@@ -199,38 +199,19 @@
                      :when (= guardian (get conf :guarded-by))]
                  symbiont))))
 
-(defn =>guardian/space
-  ```
-  Navigation to the single living space `guardian` inhabits, or nil.
-
-  A symbiont still raises one HTTP and one mycelium server, so it can
-  stand in one place at a time. When those become many, this becomes
-  `=>guardian/spaces` and the assert below is what falls away.
-  ```
-  [guardian]
-  (=> (=>guardian/spaces guardian)
-      |(do
-         (assert (>= 1 (length $))
-                 (string "Guardian " guardian " would inhabit " (length $)
-                         " living spaces, and can hold one."))
-         (first $))))
-
 (defn =>mycelium/node
   ```
   Navigation to symbiont mycelium.
 
-  A guardian owns no node. It answers on the address of the symbiont it
-  guards and takes only that: whom it speaks to is its own business,
-  declared on itself, because guarding is inhabiting a surface rather
-  than inheriting every relation behind it.
+  Every symbiont that answers on an address declares it, guardians no
+  less than the rest. A guardian used to own no node and silently answer
+  on the address of what it guarded, which held only while the two were
+  never alive at once. One that outlives its handover needs an address
+  of its own, and one that has none should say so by failing to start
+  rather than by quietly becoming a second symbiont at another door.
   ```
   [symbiont]
-  (def c @[])
-  (>or (=> :mycelium :nodes symbiont)
-       (>when (=>guardian/space symbiont)
-              (=> (<- c (=>guardian/space symbiont))
-                  (=> :mycelium :nodes |(get $ (array/pop c))
-                      |(if $ {:rpc (get $ :rpc)}))))))
+  (=> :mycelium :nodes symbiont))
 
 (defn =>mycelium/peers
   "Navigation to `symbiont` peers"
