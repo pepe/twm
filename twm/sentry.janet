@@ -172,6 +172,17 @@
           (http/not-authorized not-auth
                                (http/content-type ".html")))))))
 
+(def <handover/>
+  ```
+  Header ending the connection that asked to be let through.
+
+  A handover answers over a connection the asker will keep and reuse,
+  and the next thing it sends down it is the redirect -- to a door the
+  guardian has just closed. A closed door turns nobody away who never
+  knocks. The connection has to end with the answer.
+  ```
+  {"Connection" "close"})
+
 (def <form/>
   "Shared sentry login form."
   [:form {:method "POST" :class "f-col center"}
@@ -222,7 +233,8 @@
         (protect
           (:write conn
                   (http/html-success-resp
-                    (page @[(success guards) (<script/redirect/> address)])))
+                    (page @[(success guards) (<script/redirect/> address)])
+                    <handover/>))
           (:flush conn))
         (ev/give-supervisor :close conn)
         (produce (^aether/spawn guards "") (^place/leave guards))
@@ -244,7 +256,8 @@
       (protect
         (:write conn
                 (http/html-success-resp
-                  (page @[(success guards) (<script/redirect/> address)])))
+                  (page @[(success guards) (<script/redirect/> address)])
+                    <handover/>))
         (:flush conn))
       (ev/give-supervisor :close conn)
       (produce (^aether/spawn guards "") (^place/leave guards))
@@ -271,10 +284,11 @@
           (:write conn
                   (http/html-success-resp
                     resp
-                    (http/cookie
-                      "session"
-                      (string sk "; Secure; HttpOnly; Domain="
-                              cookie-host ";"))))
+                    (merge <handover/>
+                           (http/cookie
+                             "session"
+                             (string sk "; Secure; HttpOnly; Domain="
+                                     cookie-host ";")))))
           (:flush conn))
         (ev/give-supervisor :close conn)
         (produce (^session/new sk))
@@ -298,7 +312,8 @@
       (protect
         (:write conn
                 (http/html-success-resp
-                  (page @[(success guards) (<script/redirect/> address)])))
+                  (page @[(success guards) (<script/redirect/> address)])
+                    <handover/>))
         (:flush conn))
       (ev/give-supervisor :close conn)
       (produce (^aether/spawn guards "") (^place/leave guards))
