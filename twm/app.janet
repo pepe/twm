@@ -175,11 +175,23 @@ dynamics as set by *rpc-defines*.```
     [state ;(values inhabited)]
     [state]))
 
+(def- space/holding
+  ```
+  What every living space currently holds, keyed by the space itself.
+
+  Listeners, the fibers accepting on them and their channels are live
+  machinery, and a symbiont's state is marshalled whole whenever it hands
+  work to a thread. A fiber blocked in `net/accept` cannot cross that
+  boundary at all, so what a space holds is kept beside the state instead
+  of in it.
+  ```
+  @{})
+
 (defn space/held
   "The addresses `space` currently holds, keyed by kind."
   [space]
-  (or (space :held)
-      (let [held @{}] (put space :held held) held)))
+  (or (space/holding space)
+      (let [held @{}] (put space/holding space held) held)))
 
 (defn space/listen
   ```
@@ -192,9 +204,9 @@ dynamics as set by *rpc-defines*.```
   holding the mycelium address the rising symbiont needs.
   ```
   [space kind chan url]
-  (def [accepting listener] (server/start chan ;(server/host-port url)))
+  (def [_ listener] (server/start chan ;(server/host-port url)))
   (put (space/held space) kind
-       @{:accepting accepting :listener listener :chan chan :url url})
+       @{:listener listener :chan chan :url url})
   space)
 
 (defn ^space/vacate
@@ -211,11 +223,8 @@ dynamics as set by *rpc-defines*.```
   (make-effect
     (fn [&]
       (each held (values (space/held space))
-        (when-let [accepting (held :accepting)]
-          (protect (ev/cancel accepting "vacated")))
         (when-let [listener (held :listener)]
           (protect (:close listener)))
-        (put held :accepting nil)
         (put held :listener nil)))
     (. "vacate " (space :name))))
 
