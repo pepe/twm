@@ -285,14 +285,19 @@ dynamics as set by *rpc-defines*.```
         # fiber does exactly that when the space is vacated. Only a failure
         # that has someone waiting on it is worth a reply.
         (if-let [conn (get (fiber/getenv fiber) :conn)]
-          (with [conn conn]
+          (do
             (def err (fiber/last-value fiber))
             (eprint name " HTTP Supervisor: " err)
             (when (dyn :debug) (debug/stacktrace fiber))
             (protect
               (:write conn
                       (http/internal-server-error
-                        (string "Internal Server Error: " err)))))
+                        (string "Internal Server Error: " err))))
+            # Neither the answer nor the closing is allowed to raise. A
+            # vacated space hands its accepting fiber's failure here, and
+            # what that fiber inherited under :conn is a connection that
+            # has already been answered and closed, if it is one at all.
+            (protect (:close conn)))
           (when (dyn :debug)
             (eprint name " HTTP Supervisor: " (fiber/last-value fiber))))))
     (. "http " http)))
