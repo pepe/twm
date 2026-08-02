@@ -27,9 +27,14 @@
   Which symbiont that is comes from `=>guardian/space`, never from the
   sentry's own config, and is collected here as `:guards` so the state
   still names the place this sentry stands in.
+
+  The address it answers on for the guarded symbiont goes into `:spaces`,
+  not over its own `:rpc`. A guardian that outlives the handover has to be
+  reachable as itself while it stands in another's place, and one address
+  cannot name two living symbionts.
   ```
   [sentry]
-  (let [c @[] t @{}
+  (let [c @[] t @{} spaces @{}
         =>guards (=>guardian/space sentry)]
     (=> (<:= t (=>mycelium/peers (=> :symbionts sentry)))
         (>if =>guards
@@ -37,7 +42,21 @@
                  (<:- t :guards (fn [&] (array/peek c)))
                  (<:- t :tenant (>or (=> :symbionts |(get $ (array/peek c)) :tenant)
                                      (fn [&] (array/peek c))))
-                 (<:- t :rpc (=> :mycelium :nodes |(get $ (array/peek c)) :rpc))
+                 (<:- t :spaces
+                      (fn [config]
+                        # A guardian with no address of its own is not
+                        # standing in another's place, it is living there:
+                        # its own rpc IS the guarded one, and there is
+                        # nothing to hold separately. Declare it a mycelium
+                        # node and it becomes a symbiont that inhabits.
+                        (def guarded (array/peek c))
+                        (when (get-in config [:mycelium :nodes sentry :rpc])
+                          (put spaces guarded
+                               @{:name guarded
+                                 :guards guarded
+                                 :rpc (get-in config
+                                              [:mycelium :nodes guarded :rpc])}))
+                        spaces))
                  (<:= t (=> :membrane :nodes |(get $ (array/peek c))))
                  (>if (=> :membrane :nodes |(get $ (array/peek c)))
                       (>if (=> :membrane :nodes |(get $ (array/peek c)) :neighbors)
@@ -211,10 +230,19 @@
       "/logout" (http/dispatch {"GET" /logout})}))
 
 (defn ^assemble
-  "Assembles shared sentry HTTP routes and RPC functions."
+  ```
+  Assembles shared sentry HTTP routes and RPC functions.
+
+  Every address the sentry answers on gets the same functions, its own and
+  each one it stands in for: the tree pushes a tenant's capability to
+  whoever inhabits that tenant's address, and it must find a `:refresh`
+  there whether the symbiont or its guardian is holding it.
+  ```
   [templates rpc-funcs]
   (make-update
     (fn [_ state]
+      (each space (values (get state :spaces {}))
+        (update space :rpc (update-rpc rpc-funcs)))
       ((=> (>put :routes (routes templates))
            (>put :static false)
            (>update :rpc (update-rpc rpc-funcs)))

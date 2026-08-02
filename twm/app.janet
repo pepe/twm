@@ -163,14 +163,17 @@ dynamics as set by *rpc-defines*.```
   ```
   The living spaces a symbiont raises.
 
-  A symbiont that declares none raises its own, described by the state
-  itself, which is how every symbiont holding a single membrane reads.
-  A symbiont standing in several places declares one space each, and a
-  space describes itself with the same keys the state would: `:http`,
-  `:rpc`, `:routes`, `:public`, `:static`, `:name`, `:log` and `:view`.
+  A symbiont always raises its own, described by the state itself, and
+  then one for every place it stands in for another. A space describes
+  itself with the same keys the state would: `:http`, `:rpc`, `:routes`,
+  `:public`, `:static`, `:name`, `:log` and `:view`, and carries only the
+  addresses it actually answers on — a guardian's own space is mycelium
+  alone, and `HTTP` and `RPC` each take the spaces that concern them.
   ```
   [state]
-  (or (state :spaces) [state]))
+  (if-let [inhabited (state :spaces)]
+    [state ;(values inhabited)]
+    [state]))
 
 (defn space/held
   "The addresses `space` currently holds, keyed by kind."
@@ -277,7 +280,7 @@ dynamics as set by *rpc-defines*.```
   "Creates a producer with a running HTTP server for every living space."
   [_ state _]
   (setdyn :debug (state :debug))
-  (seq [space :in (spaces state)] (^space/http space)))
+  (seq [space :in (spaces state) :when (space :http)] (^space/http space)))
 
 (defn ^delay
   "Delay the `event` for `s` time"
@@ -419,7 +422,7 @@ dynamics as set by *rpc-defines*.```
   "Creates a producer with a running RPC server for every living space."
   [_ state _]
   (def {:psk psk :debug deb} state)
-  (seq [space :in (spaces state)] (^space/rpc space psk deb)))
+  (seq [space :in (spaces state) :when (space :rpc)] (^space/rpc space psk deb)))
 
 (defn on-error
   "Manages errors for events' manager. Transacts detail logging."
