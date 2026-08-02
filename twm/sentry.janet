@@ -75,6 +75,42 @@
                  (<:- t :spaces (fn [&] spaces))))
         (>base t))))
 
+(defn ^place/leave
+  ```
+  Gives up the place this symbiont holds for `place`.
+
+  A guardian holding it as a space lets go of its addresses and lives on,
+  keeping its peers, its registration and its session for the next time
+  the place falls empty. One whose whole membrane is that place has
+  nothing to let go of short of itself, and exits as it always did.
+  ```
+  [place]
+  (make-watch
+    (fn [_ state _]
+      (if-let [space (get-in state [:spaces place])]
+        (^space/vacate space)
+        Exit))
+    (. "leave " place)))
+
+(defn ^place/resume
+  "Takes back the living space this symbiont holds for `place`."
+  [place]
+  (make-watch
+    (fn [_ state _]
+      (if-let [space (get-in state [:spaces place])]
+        (^space/resume space)))
+    (. "resume " place)))
+
+(def- rpc/guardian
+  ```
+  What every guardian answers, beside whatever its project adds: the
+  demiurge asks it to take a place back when the symbiont holding it goes.
+  ```
+  @{:space/resume
+    (fnr :space/resume [produce-resp ok-resp]
+         (def [place] args)
+         [(^place/resume (keyword place))])})
+
 (define-watch Spawn
   "Write spawn to aether"
   [_ {:guarded-by sentry} _]
@@ -176,8 +212,7 @@
                     (page @[(success guards) (<script/redirect/> address)])))
           (:flush conn))
         (ev/give-supervisor :close conn)
-        (produce (^aether/spawn guards ""))
-        (produce Exit)
+        (produce (^aether/spawn guards "") (^place/leave guards))
         {}))
     (http/html-success-resp
       (page @[(if (function? title) (title (human guards)) title)
@@ -198,8 +233,7 @@
                   (page @[(success guards) (<script/redirect/> address)])))
         (:flush conn))
       (ev/give-supervisor :close conn)
-      (produce (^aether/spawn guards ""))
-      (produce Exit)
+      (produce (^aether/spawn guards "") (^place/leave guards))
       {})
     (http/see-other "/")))
 
@@ -229,8 +263,7 @@
           (:flush conn))
         (ev/give-supervisor :close conn)
         (produce (^session/new sk))
-        (produce (^aether/spawn guards ""))
-        (produce Exit)))
+        (produce (^aether/spawn guards "") (^place/leave guards))))
     (http/html-success-resp (page @[failure <form/>]))))
 
 (defn routes
@@ -256,7 +289,7 @@
   (make-update
     (fn [_ state]
       (each place [state ;(values (get state :spaces {}))]
-        (update place :rpc (update-rpc rpc-funcs))
+        (update place :rpc (update-rpc (merge rpc/guardian rpc-funcs)))
         (put place :routes (routes templates))
         (put place :static false))
       state)

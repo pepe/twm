@@ -90,6 +90,24 @@
           (put state peer (string (ep :host) ":" (ep :port))))))
     (. "remove peer " peer)))
 
+(defn ^place/return
+  ```
+  Asks the guardian of `peer`, if one is still standing, to take back the
+  place `peer` has just left.
+
+  The asking happens on the peer's departure rather than on its request to
+  be relieved, so the address is free before anyone reaches for it. A
+  guardian that is not running needs no telling: it will be born into that
+  place by the Aether as it always was.
+  ```
+  [peer]
+  (make-effect
+    (fn [_ state _]
+      (def guardian (get-in state [:config :symbionts peer :guarded-by]))
+      (when (and guardian (get-in state [:view :spawned guardian]))
+        (protect (:space/resume (state guardian) peer))))
+    (. "return place of " peer)))
+
 (defn ^peer/stop
   "Stops one peer"
   [peer]
@@ -210,7 +228,8 @@
             (if (zero? exit-code)
               (log (or peer group) " exited with success")
               (log (or peer group) " exited with code " exit-code))
-            (^peer/remove group)))))
+            (^peer/remove group)
+            (^place/return group)))))
     (. "run peer " peer)))
 
 (define-event RunPeers
