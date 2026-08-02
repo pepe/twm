@@ -169,49 +169,48 @@
   ```
   Runs one peer, reads its Aether while alive, and observes its eventual exit.
 
-  With `once`, the peer is run only when it is not spawned already. The
-  check belongs here because this is the last place before the birth that
-  still reads the live `:spawned`; the Aether asks from inside a thread,
-  which sees only the marshalled copy its thread was born with.
+  The producer is not threaded. It reads a pipe and waits on a process,
+  which the event loop carries without one, and a thread would only be
+  handed a marshalled copy of the state -- a snapshot of `:spawned` that
+  goes stale the moment another peer is born.
   ```
-  [group &opt peer cmd flags once]
+  [group &opt peer cmd flags]
   (make-watch
     (fn [_ state _]
       (def {:entries entries} state)
-      (unless (and once (get-in state [:view :spawned group]))
-        (thread-producer
-          (default peer group)
-          (def [_ _ [ecmd eflags]] (entries peer))
-          (default cmd ecmd)
-          (default flags eflags)
-          (let [proc (peer/pipe-out state peer cmd flags)]
-            (produce (^peer/save-spawned group :boot))
-            (forever
-              (match (protect (aether/read-message (proc :out)))
-                [true {:op :ready}]
-                (produce (^peer/connect group (^peer/save-spawned group :mycelium)))
-                [true {:op :spawn :peer target :arg arg}]
-                (let [source (((state :nav/symbiont) group) (state :config))
-                      allowed @[(source :guards) (source :guarded-by)]]
-                  (assert (and (keyword? target) (string? arg) (index-of target allowed))
-                          (. "Aether spawn from " group " is not permitted."))
+      (producer
+        (default peer group)
+        (def [_ _ [ecmd eflags]] (entries peer))
+        (default cmd ecmd)
+        (default flags eflags)
+        (let [proc (peer/pipe-out state peer cmd flags)]
+          (produce (^peer/save-spawned group :boot))
+          (forever
+            (match (protect (aether/read-message (proc :out)))
+              [true {:op :ready}]
+              (produce (^peer/connect group (^peer/save-spawned group :mycelium)))
+              [true {:op :spawn :peer target :arg arg}]
+              (let [source (((state :nav/symbiont) group) (state :config))
+                    allowed @[(source :guards) (source :guarded-by)]]
+                (assert (and (keyword? target) (string? arg) (index-of target allowed))
+                        (. "Aether spawn from " group " is not permitted."))
+                (if-not (get-in state [:view :spawned target])
                   (let [[_ _ [next-cmd next-flags]] (entries target)]
-                    (produce (^peer/run target target [;next-cmd arg]
-                                        next-flags :once))))
-                [true {:op :result}]
-                (produce (log "Aether result from " group))
-                [true {:op op}]
-                (produce (log "Aether operation " op " from " group " is reserved."))
-                [false err]
-                (do
-                  (produce (log "Aether from " group " closed: " err))
-                  (break))))
-            (def exit-code (os/proc-wait proc))
-            (produce
-              (if (zero? exit-code)
-                (log (or peer group) " exited with success")
-                (log (or peer group) " exited with code " exit-code))
-              (^peer/remove group))))))
+                    (produce (^peer/run target target [;next-cmd arg] next-flags)))))
+              [true {:op :result}]
+              (produce (log "Aether result from " group))
+              [true {:op op}]
+              (produce (log "Aether operation " op " from " group " is reserved."))
+              [false err]
+              (do
+                (produce (log "Aether from " group " closed: " err))
+                (break))))
+          (def exit-code (os/proc-wait proc))
+          (produce
+            (if (zero? exit-code)
+              (log (or peer group) " exited with success")
+              (log (or peer group) " exited with code " exit-code))
+            (^peer/remove group)))))
     (. "run peer " peer)))
 
 (define-event RunPeers
