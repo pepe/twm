@@ -14,6 +14,18 @@
       "new session")
     Empty))
 
+(defn- guarded/surface
+  ```
+  The surface `guarded` presents to the outside: the membrane node it
+  declares, and beside it the address of every neighbour that node names.
+  ```
+  [config guarded]
+  (def node (get-in config [:membrane :nodes guarded]))
+  (def surface (if node (merge @{} node) @{}))
+  (each neighbour (get surface :neighbors [])
+    (put surface neighbour (get-in config [:membrane :nodes neighbour :address])))
+  surface)
+
 (defn =>sentry/initial-state
   ```
   Navigation to sentry initial state.
@@ -42,28 +54,25 @@
                  (<:- t :guards (fn [&] (array/peek c)))
                  (<:- t :tenant (>or (=> :symbionts |(get $ (array/peek c)) :tenant)
                                      (fn [&] (array/peek c))))
-                 (<:- t :spaces
-                      (fn [config]
-                        # A guardian with no address of its own is not
-                        # standing in another's place, it is living there:
-                        # its own rpc IS the guarded one, and there is
-                        # nothing to hold separately. Declare it a mycelium
-                        # node and it becomes a symbiont that inhabits.
-                        (def guarded (array/peek c))
-                        (when (get-in config [:mycelium :nodes sentry :rpc])
-                          (put spaces guarded
-                               @{:name guarded
-                                 :guards guarded
-                                 :rpc (get-in config
-                                              [:mycelium :nodes guarded :rpc])}))
-                        spaces))
-                 (<:= t (=> :membrane :nodes |(get $ (array/peek c))))
-                 (>if (=> :membrane :nodes |(get $ (array/peek c)))
-                      (>if (=> :membrane :nodes |(get $ (array/peek c)) :neighbors)
-                           (=> (<- c (=> :membrane :nodes |(get $ (array/peek c)) :neighbors))
-                               (<:= t (=> :membrane :nodes
-                                          |(tabseq [i :in (array/pop c)] i
-                                             ((=> i :address) $)))))))))
+                 (fn [config]
+                   # A guardian with no address of its own is not standing
+                   # in another's place, it is living there: the membrane
+                   # is simply its own. Declare it a mycelium node and it
+                   # becomes a symbiont that inhabits, holding that place
+                   # as a space it can give up again.
+                   (def guarded (array/peek c))
+                   (def surface (guarded/surface config guarded))
+                   (if (get-in config [:mycelium :nodes sentry :rpc])
+                     (put spaces guarded
+                          (merge surface
+                                 @{:name guarded
+                                   :guards guarded
+                                   :tenant (t :tenant)
+                                   :rpc (get-in config
+                                                [:mycelium :nodes guarded :rpc])}))
+                     (merge-into t surface))
+                   config)
+                 (<:- t :spaces (fn [&] spaces))))
         (>base t))))
 
 (define-watch Spawn
@@ -134,12 +143,17 @@
   (make-event
     {:update
      (fn [_ state]
-       (put state :view
-            (merge
-              (select-keys state [:name :guards :secret :key
-                                  :public :cookie-host :address])
-              @{:cap/session (>base false)
-                :templates templates})))
+       # One capability, held by every view. It belongs to the tenant, not
+       # to any one of its places, so a single push must reach them all.
+       (def cap (>base false))
+       (defn view/of [place]
+         (merge (select-keys state [:name :secret :key])
+                (select-keys place [:guards :public :cookie-host :address :tenant])
+                @{:cap/session cap :templates templates}))
+       (each space (values (get state :spaces {}))
+         (merge-into space (select-keys state [:log :debug]))
+         (put space :view (view/of space)))
+       (put state :view (view/of state)))
      :effect
      (fn [_ state _]
        (setdyn :view (state :view)))}
@@ -241,16 +255,23 @@
   [templates rpc-funcs]
   (make-update
     (fn [_ state]
-      (each space (values (get state :spaces {}))
-        (update space :rpc (update-rpc rpc-funcs)))
-      ((=> (>put :routes (routes templates))
-           (>put :static false)
-           (>update :rpc (update-rpc rpc-funcs)))
-        state))
+      (each place [state ;(values (get state :spaces {}))]
+        (update place :rpc (update-rpc rpc-funcs))
+        (put place :routes (routes templates))
+        (put place :static false))
+      state)
     "assemble sentry"))
 
 (defn run
-  "Runs the shared sentry lifecycle around project templates and start events."
+  ```
+  Runs the shared sentry lifecycle around project templates and start events.
+
+  It announces itself on the Aether as every other symbiont does. A sentry
+  that hands its place over by dying had nothing to announce and no one to
+  hear it; one that outlives the handover is a peer the demiurge has to be
+  able to reach, and the demiurge learns an address is answering only from
+  the readiness that crosses the Aether.
+  ```
   [config templates rpc-funcs start & before]
   (-> config
       (make-manager on-error)
@@ -258,7 +279,8 @@
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
                  HTTP
-                 (^connect-peers start Exit))
+                 (^connect-peers start Exit)
+                 AetherReady)
       :await))
 
 (defmacro main

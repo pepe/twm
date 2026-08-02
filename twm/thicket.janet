@@ -93,11 +93,19 @@
     "connect peers"))
 
 (defn ^session/cap
-  "Saves sesion"
+  ```
+  Saves the session capability in every view the symbiont serves.
+
+  The capability is the tenant's, not any one place's, and a symbiont
+  standing in several of a tenant's places must answer for all of them
+  from the single push that carries it.
+  ```
   [cap]
   (make-update
-    (def-state _
-      (>update :view (>put :cap/session cap)))
+    (fn [_ state]
+      (each place [state ;(values (get state :spaces {}))]
+        (if-let [view (place :view)]
+          (put view :cap/session cap))))
     "save session"))
 
 (defn ^tenant/register
@@ -138,9 +146,11 @@
   [& colls]
   (make-update
     (fn [_ state]
-      (def {:tree tree :view view :tenant tenant} state)
-      (each coll colls
-        (put view coll (coll tree tenant))))
+      (def {:tree tree :tenant tenant} state)
+      (each place [state ;(values (get state :spaces {}))]
+        (if-let [view (place :view)]
+          (each coll colls
+            (put view coll (coll tree tenant))))))
     (. "refresh view " ;colls)))
 
 (defn ^peer/refresh-view
