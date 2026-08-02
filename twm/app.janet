@@ -301,17 +301,43 @@ dynamics as set by *rpc-defines*.```
   [_ {:name name} _] [(log name " is exiting.") Stop])
 
 (def aether/magic
-  "Wire prefix for version-one Aether frames."
-  "AETH01")
+  "Wire prefix for version-two Aether frames."
+  "AETH02")
 
 (def aether/max-size
   "Largest accepted Aether payload in bytes."
   (* 64 1024))
 
-(defn aether/frame
-  "Frames an Aether payload with its versioned prefix and fixed-width byte length."
+(defn aether/hex
+  ```
+  The bytes of `payload` spelled out in hexadecimal.
+
+  A marshalled payload carries whatever bytes it pleases, newlines among
+  them, and the Aether travels over stdout, which is a text stream: every
+  newline written to it on Windows arrives as two bytes. The frame is then
+  longer than its length declares and the reader begins the next frame in
+  the middle of this one. Hex has no newline to translate.
+
+  Nothing showed while a guardian wrote one frame and died, because there
+  was no next frame to begin in the wrong place.
+  ```
   [payload]
-  (string aether/magic (string/format "%012d" (length payload)) payload))
+  (string/join (map |(string/format "%02x" $) payload)))
+
+(defn aether/unhex
+  "The bytes that `hex` spells out."
+  [hex]
+  (def bytes @"")
+  (loop [i :range [0 (length hex) 2]]
+    (buffer/push-byte bytes
+                      (scan-number (string "0x" (string/slice hex i (+ i 2))))))
+  bytes)
+
+(defn aether/frame
+  "Frames an Aether payload with its versioned prefix and fixed-width length."
+  [payload]
+  (def hex (aether/hex payload))
+  (string aether/magic (string/format "%012d" (length hex)) hex))
 
 (defn- aether/read-exact
   [stream n]
@@ -331,7 +357,7 @@ dynamics as set by *rpc-defines*.```
   (def size (scan-number (string (aether/read-exact stream 12))))
   (assert (and size (<= 0 size aether/max-size))
           "Invalid Aether message length")
-  (aether/read-exact stream size))
+  (aether/unhex (string (aether/read-exact stream size))))
 
 (def aether/operations
   "Version-one Aether operation vocabulary; only ready, spawn, and result are live today."
