@@ -348,7 +348,8 @@ dynamics as set by *rpc-defines*.```
   "Reads and validates one marshalled Aether envelope from `stream`."
   [stream]
   (def message (unmarshal (aether/read stream)))
-  (assert (aether/message? message) "Invalid Aether message")
+  (assert (aether/message? message)
+          (string/format "Invalid Aether message: %p" message))
   message)
 
 (defn ^aether

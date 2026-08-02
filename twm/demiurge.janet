@@ -229,7 +229,11 @@
               (produce (log "Aether operation " op " from " group " is reserved."))
               [false err]
               (do
-                (produce (log "Aether from " group " closed: " err))
+                # A peer's Aether ends when the peer does, which is the
+                # ordinary close of an ordinary life. Only an Aether that
+                # stops mid-word has something to report.
+                (unless (string/has-prefix? "Aether stream ended" err)
+                  (produce (log "Aether from " group " closed: " err)))
                 (break))))
           (def exit-code (os/proc-wait proc))
           (produce
