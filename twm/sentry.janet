@@ -87,12 +87,23 @@
     (. "leave " place)))
 
 (defn ^place/resume
-  "Takes back the living space this symbiont holds for `place`."
+  ```
+  Takes back the living space this symbiont holds for `place`, and asks
+  the tree what the tenant's session is before answering on it again.
+
+  A guardian used to be born into a place it took back, and a newborn
+  reads the session as it registers. One that outlives the handover has
+  been standing elsewhere while the world changed, and the push telling
+  it so is racing the first request through the door it just reopened --
+  a logout loses that race, and the door opens to a session that ended.
+  Reading on the way in does not race anything.
+  ```
   [place]
   (make-watch
     (fn [_ state _]
       (if-let [space (get-in state [:spaces place])]
-        (^space/resume space)))
+        [(^tenant/refresh-view :cap/session)
+         (^space/resume space)]))
     (. "resume " place)))
 
 (def- rpc/guardian
