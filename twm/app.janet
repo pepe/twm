@@ -377,8 +377,8 @@ dynamics as set by *rpc-defines*.```
   (aether/unhex (string (aether/read-exact stream size))))
 
 (def aether/operations
-  "Version-one Aether operation vocabulary; only ready, spawn, and result are live today."
-  [:ready :spawn :build :deploy :release :result])
+  "Version-one Aether operation vocabulary; only ready, spawn, left, and result are live today."
+  [:ready :spawn :left :build :deploy :release :result])
 
 (defn aether/message?
   "Whether `message` is one of the narrow version-one Aether envelopes."
@@ -409,6 +409,18 @@ dynamics as set by *rpc-defines*.```
   "Requests the permitted birth of `peer`, optionally carrying its argument."
   [peer arg]
   (^aether @{:op :spawn :peer peer :arg arg}))
+
+(defn ^aether/left
+  ```
+  Says that `place` has been let go of and is free for its guardian.
+
+  Announced rather than asked, and only ever after the addresses are
+  actually closed: it is a report of something already done, so whoever
+  acts on it cannot arrive too early. A place nobody guards is announced
+  all the same and simply interests no one.
+  ```
+  [place]
+  (^aether @{:op :left :place place}))
 
 (defn ok-resp
   "RPC MW that returns :ok after the body"

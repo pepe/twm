@@ -69,19 +69,35 @@
           config)
         (>base t))))
 
+(defn place/of
+  ```
+  The living space this symbiont holds for `place`, or nil.
+
+  A symbiont raises its own place as well as every place it stands in for
+  another, and `spaces` has always described the state itself as the
+  first of them. Only the operations over places did not know it, so a
+  symbiont could stand in a door and have no way to speak of it.
+  ```
+  [state place]
+  (or (get-in state [:spaces place])
+      (if (= place (state :name)) state)))
+
 (defn ^place/leave
   ```
   Gives up the place this symbiont holds for `place`.
 
-  A guardian holding it as a space lets go of its addresses and lives on,
-  keeping its peers, its registration and its session for the next time
-  the place falls empty. One whose whole membrane is that place has
-  nothing to let go of short of itself, and exits as it always did.
+  Whoever holds it lets go of its addresses and lives on, keeping its
+  peers, its registration and its session. Letting go is not dying: what
+  the holder does afterwards -- stand in another door, or exit -- is its
+  own affair, and is said by whoever asked it to leave.
+
+  A `place` this symbiont does not hold is the old, blunt case: there is
+  nothing to let go of short of itself, and it exits as it always did.
   ```
   [place]
   (make-watch
     (fn [_ state _]
-      (if-let [space (get-in state [:spaces place])]
+      (if-let [space (place/of state place)]
         (^space/vacate space)
         Exit))
     (. "leave " place)))
@@ -101,7 +117,7 @@
   [place]
   (make-watch
     (fn [_ state _]
-      (if-let [space (get-in state [:spaces place])]
+      (if-let [space (place/of state place)]
         [(^tenant/refresh-view :cap/session)
          (^space/resume space)]))
     (. "resume " place)))
@@ -116,25 +132,39 @@
          (def [place] args)
          [(^place/resume (keyword place))])})
 
-(define-watch Spawn
-  "Write spawn to aether"
-  [_ {:guarded-by sentry} _]
-  (^aether/spawn sentry ""))
+(define-watch StandDown
+  ```
+  Gives up this symbiont's own place and exits.
 
-(define-watch SpawnExit
-  "Conditionaly spawn and exits the manager"
-  [_ {:guarded-by sentry :name name} _]
-  (producer
-    (if sentry (produce Spawn))
-    (produce Exit)))
+  The order is the whole of it: the addresses close here and now, the
+  place is reported free only once they have, and the exit comes last.
+  Announcing first would send whoever acts on the report to a door still
+  held, which is the mistake this replaces.
+
+  The closing is done here rather than produced as an event for the same
+  reason `space/let-go` exists at all -- a watch runs before any effect of
+  the same transaction, so a released-place event would be announced
+  before it had released anything.
+  ```
+  [_ state _]
+  (def name (state :name))
+  (if-let [space (place/of state name)] (space/let-go space))
+  [(^aether/left name) Exit])
 
 (defh /logout
-  "Clears the current session; guarded dashboards then hand control back to sentry."
+  ```
+  Clears the current session.
+
+  A symbiont serving this from its own membrane stands down afterwards, so
+  its guardian takes the door back and asks for the secret again. A
+  guardian serving it is already the one who would take the door back, and
+  simply keeps standing.
+  ```
   []
   (define :view)
   (produce (^session/new ""))
-  (if (view :guarded-by)
-    (produce SpawnExit))
+  (unless (view :space)
+    (produce StandDown))
   (http/see-other "/"))
 
 (defn =>session/?eq
