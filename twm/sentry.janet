@@ -14,6 +14,54 @@
       "new session")
     Empty))
 
+(defn session/settled?
+  ```
+  Whether the tree agrees `tenant`'s session is now `session`.
+
+  Asked by offering the tree's own capability the very session in
+  question: a capability only admits the session it was made from, so one
+  that admits this session was made after the change landed.
+  ```
+  [tree tenant session]
+  (match (protect ((:cap/session tree tenant)
+                    {:headers {"Cookie" {"session" session}}}))
+    [true admitted] (truthy? admitted)
+    # A tree that will not answer has not agreed to anything.
+    false))
+
+(defn ^session/end
+  ```
+  Ends `tenant`'s session, waits until the tree agrees it has ended, and
+  only then produces `after`.
+
+  The waiting is the whole of it. `:session/new` is answered before it is
+  applied -- the tree's handler produces its events and the reply goes
+  back while they are still to be transacted -- so anything that acted on
+  the ending in that gap read the session that was. A symbiont that
+  reported its place free straight afterwards had its guardian take the
+  door back and read the old capability as it went, and the door opened
+  again to the cookie just logged out.
+
+  It is asked before any waiting, so an ending that has already landed
+  costs nothing, and it gives up after a second rather than hold a door
+  open on a tree that has stopped answering.
+  ```
+  [& after]
+  (make-watch
+    (fn [_ state _]
+      (producer
+        (def {:tree tree :name name} state)
+        (def tenant (or (state :tenant) name))
+        (protect (:session/new tree tenant ""))
+        (var settled (session/settled? tree tenant ""))
+        (var tries 0)
+        (while (and (not settled) (< tries 50))
+          (ev/sleep 0.02)
+          (++ tries)
+          (set settled (session/settled? tree tenant "")))
+        (if (present? after) (produce ;after))))
+    "end session"))
+
 (defn- guarded/surface
   ```
   The surface `guarded` presents to the outside: the membrane node it
@@ -162,9 +210,15 @@
   ```
   []
   (define :view)
-  (produce (^session/new ""))
-  (unless (view :space)
-    (produce StandDown))
+  (produce
+    (if (view :space)
+      # A guardian keeps standing, so nobody takes the door back and reads
+      # the capability on the way in. It has to read it itself, and by
+      # asking rather than by being told: the tree's push reaches whoever
+      # it can dial, and a guardian it cannot dial would go on admitting
+      # the session it was holding.
+      (^session/end (^tenant/refresh-view :cap/session))
+      (^session/end StandDown)))
   (http/see-other "/"))
 
 (defn =>session/?eq
