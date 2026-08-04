@@ -718,15 +718,42 @@ dynamics as set by *rpc-defines*.```
        freeze))
 
 (defn <script/redirect/>
-  "hg representation of the redirect script"
+  ```
+  hg representation of the redirect script.
+
+  It knocks before it goes. A handover closes the door before it answers,
+  so until the rising symbiont binds there is nobody behind the address at
+  all, and a browser sent there in that gap meets a refusal rather than a
+  wait wherever a closed port is answered honestly. Waiting a fixed
+  moment instead only moves the guess: a symbiont is usually ready in a
+  tenth of a second and has been seen to take four.
+
+  Asking turns the gap into a pause of exactly its own length. Any answer
+  will do, refusal included -- what is being asked is whether anyone is
+  standing there, not what they would say. It gives up asking after half a
+  minute and goes anyway, because a door that never opens is better seen
+  than waited on forever.
+  ```
   [&opt address]
   (default address "/")
   [:script
    (hg/raw
-     (. ``function redirect() {
-            document.location = "`` address ``";
+     (. ``var mtbDoor = "`` address ``";
+          function mtbAnswered() {
+            return fetch(mtbDoor, {mode: "no-cors", cache: "no-store"})
+                     .then(function () { return true; })
+                     .catch(function () { return false; });
           }
-          setTimeout(redirect, 1000);``))])
+          function mtbEnter(waited) {
+            mtbAnswered().then(function (answered) {
+              if (answered || waited >= 30000) {
+                document.location = mtbDoor;
+              } else {
+                setTimeout(function () { mtbEnter(waited + 150); }, 150);
+              }
+            });
+          }
+          mtbEnter(0);``))])
 
 (defn sanitize-nl
   "Replaces \n for <br>"
