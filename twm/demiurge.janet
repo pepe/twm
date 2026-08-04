@@ -4,6 +4,29 @@
 
 (setdyn *rpc-defines* [:view])
 
+(def- peer/running
+  ```
+  The process of every peer the Demiurge currently holds, keyed by peer.
+
+  A process handle is live machinery and the Demiurge's state is marshalled
+  whole whenever it hands work to a thread, so what it is holding is kept
+  beside the state rather than in it -- the same reason a living space
+  keeps its listeners outside.
+  ```
+  @{})
+
+(def peer/patience
+  ```
+  Seconds a peer is given to go once it has been asked to.
+
+  Asking is not making. A peer that does not answer its mycelium address
+  never hears the asking at all, and one that hears it can still fail to
+  reach its own exit; either way it goes on holding every address it
+  bound, and the next one raised in its place cannot listen. After this
+  much waiting the Demiurge stops asking.
+  ```
+  10)
+
 (defn peer/spit-conf
   "Spits the config for the `peer`"
   [state peer &opt nav]
@@ -108,11 +131,35 @@
         (protect (:space/resume (state guardian) peer))))
     (. "return place of " peer)))
 
+(defn ^peer/insist
+  ```
+  Sees that a peer asked to stop has actually gone, and ends it if it
+  has not.
+
+  A peer that outstays its asking is not merely late. It holds every
+  address it bound, so the peer raised next in its place cannot listen,
+  and the guardian standing behind it is never told to take the place
+  back -- one process that will not go takes a door down with it.
+  ```
+  [peer]
+  (make-watch
+    (fn [&]
+      (def asked (peer/running peer))
+      (producer
+        (ev/sleep peer/patience)
+        # A place rarely stays empty for long: the one asked to go may
+        # have gone and another risen in its stead while this waited.
+        # Only the process actually asked is this one's to end.
+        (when (and asked (= asked (peer/running peer)))
+          (produce (log peer " did not go when asked; ending it"))
+          (protect (os/proc-kill asked)))))
+    (. "insist " peer)))
+
 (defn ^peer/stop
   "Stops one peer"
   [peer]
   (make-event
-    {:watch (^peer/remove peer)
+    {:watch [(^peer/remove peer) (^peer/insist peer)]
      :effect
      (fn [_ state _]
        (def pc (state peer))
@@ -209,6 +256,7 @@
         (default cmd ecmd)
         (default flags eflags)
         (let [proc (peer/pipe-out state peer cmd flags)]
+          (put peer/running group proc)
           (produce (^peer/save-spawned group :boot))
           (forever
             (match (protect (aether/read-message (proc :out)))
@@ -236,6 +284,7 @@
                   (produce (log "Aether from " group " closed: " err)))
                 (break))))
           (def exit-code (os/proc-wait proc))
+          (put peer/running group nil)
           (produce
             (if (zero? exit-code)
               (log (or peer group) " exited with success")
