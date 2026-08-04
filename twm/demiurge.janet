@@ -271,6 +271,21 @@
                 (if-not (get-in state [:view :spawned target])
                   (let [[_ _ [next-cmd next-flags]] (entries target)]
                     (produce (^peer/run target target [;next-cmd arg] next-flags)))))
+              # A place is reported free by whoever let it go, and the
+              # report arrives after the closing, so the guardian asked to
+              # take it back can never arrive at a door still held. Only
+              # the holder may report its own place free.
+              [true {:op :left :place place}]
+              (do
+                (assert (and (keyword? place)
+                             (or (= place group)
+                                 (index-of place
+                                           (keys (get (((state :nav/symbiont) group)
+                                                        (state :config))
+                                                      :spaces {})))))
+                        (. "Aether left from " group " is not permitted."))
+                (produce (log group " reports " place " free")
+                         (^place/return place)))
               [true {:op :result}]
               (produce (log "Aether result from " group))
               [true {:op op}]
@@ -345,8 +360,19 @@
     (^peer/ping peer)))
 
 (define-watch CheckPeers
-  "Restarts peers that missed three consecutive heartbeats."
-  [_ {:view view :timeout timeout} _]
+  ```
+  Restarts peers that missed three consecutive heartbeats, stops those gone
+  quieter than the thicket's patience, and raises again any peer the
+  thicket wants standing that is no longer there.
+
+  The last is not a nicety. A peer that dies is taken out of `:spawned`,
+  and `PingPeers` only pings what is in it, so nothing else here would
+  ever look for it again: a guardian that fell over would stay fallen,
+  and every door it was holding would stay shut. Peers raised on demand
+  are not autostarted and so are not missed -- being absent is their
+  ordinary condition.
+  ```
+  [_ {:view view :timeout timeout :autostart autostart} _]
   (def c @[])
   ((=>
      (<- c (=<> :misses pairs (>Y (=<> 1 (?gt 2)))
@@ -355,8 +381,13 @@
      (<- c (=<> :activity pairs (>Y (=<> last |(- (os/time) $) (?gt timeout)))
                 (>map (=<> 0 |[(^peer/clear $) (^peer/no-active $)
                                (^peer/stop $)]))))
-     (>base c) flatten)
-    view))
+     (>base c))
+    view)
+  (each peer (or autostart [])
+    (unless (get-in view [:spawned peer])
+      (array/push c [(log peer " is wanted standing and is not; raising it")
+                     (^peer/run peer)])))
+  (flatten c))
 
 (defn ^peer/deploy
   "Deploys one peer and records the build revision beside its release executable."
