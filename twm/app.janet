@@ -770,20 +770,19 @@ dynamics as set by *rpc-defines*.```
    (hg/raw
      (. ``var mtbDoor = "`` address ``";
           function mtbAnswered() {
-            return fetch(mtbDoor, {cache: "no-store", credentials: "include"})
+            var controller = new AbortController();
+            var timeout = setTimeout(function () { controller.abort(); }, 500);
+            return fetch(mtbDoor, {cache: "no-store", credentials: "include",
+                                   signal: controller.signal})
                      .then(function (response) {
-                       return {reachable: true,
-                               ready: response.status >= 200 &&
-                                      response.status < 400 &&
-                                      response.status !== 401};
+                       return response.status >= 200 && response.status < 400;
                      })
-                     .catch(function () { return {reachable: false, ready: false}; });
+                     .catch(function () { return false; })
+                     .finally(function () { clearTimeout(timeout); });
           }
           function mtbEnter(waited) {
             mtbAnswered().then(function (answered) {
-              if (answered.ready ||
-                  (answered.reachable && waited >= 5000) ||
-                  waited >= 30000) {
+              if (answered || waited >= 30000) {
                 document.location = mtbDoor;
               } else {
                 setTimeout(function () { mtbEnter(waited + 150); }, 150);
