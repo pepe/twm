@@ -10,6 +10,9 @@
     (make-effect
       (fn [_ {:tree tree :tenant tenant :name name} _]
         (default tenant name)
+        (produce (diag "session-new name=" name " tenant=" tenant
+                       " present=" (present-string? session)
+                       " length=" (length session)))
         (:session/new tree tenant session))
       "new session")
     Empty))
@@ -52,6 +55,7 @@
       (producer
         (def {:tree tree :name name} state)
         (def tenant (or (state :tenant) name))
+        (produce (diag "session-end-begin name=" name " tenant=" tenant))
         (protect (:session/new tree tenant ""))
         (var settled (session/settled? tree tenant ""))
         (var tries 0)
@@ -59,6 +63,8 @@
           (ev/sleep 0.02)
           (++ tries)
           (set settled (session/settled? tree tenant "")))
+        (produce (diag "session-end-settled name=" name " tenant=" tenant
+                       " settled=" settled " tries=" tries))
         (if (present? after) (produce ;after))))
     "end session"))
 
@@ -253,6 +259,10 @@
   (def done (ev/chan 1))
   (def sent (ev/chan 1))
   (def settled (logout/settled done))
+  (produce (diag "logout-request name=" (view :name)
+                 " guarded=" (boolean (view :guards))
+                 " own-space=" (boolean (view :space))
+                 " session-cap=" (boolean (view :cap/session))))
   (produce
     # Close the local capability first, so in-flight requests cannot render
     # the old dashboard while Tree is applying the logout.
@@ -289,6 +299,9 @@
   (http/cookies
     (fn check-session [req]
       (define :view)
+      (produce (diag "session-check name=" (view :name)
+                     " cookie-present=" (boolean (get-in req [:headers "Cookie" "session"]))
+                     " cap-present=" (boolean (view :cap/session))))
       (if-let [ck ((view :cap/session) req)]
         (next-middleware req)
         (http/not-authorized)))))

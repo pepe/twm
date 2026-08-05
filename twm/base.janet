@@ -30,6 +30,22 @@
           (eprin (dt/format-date-time t) "." (slice p 2 7) " - ")
           (eprint ;msg))) "log")))
 
+(defn diag
+  "Create a redacted diagnostic logging event.
+
+  Diagnostic output follows the normal log switch so it is available in a
+  deployed instance without changing the event machinery.  It is deliberately
+  prefixed, making the temporary trace easy to filter or remove later."
+  [& msg]
+  (make-effect
+    (fn diagnostic [_ state _]
+      (when (or (state :log) (state :debug) (state :diagnostic))
+        (let [now (os/clock)
+              t (math/floor now)
+              p (string (mod now 1))]
+          (eprin (dt/format-date-time t) "." (slice p 2 7) " - DIAG ")
+          (eprint ;msg))) "diagnostic"))
+
 (defn logr
   "Create logging event from the message `msg`."
   [& msg]

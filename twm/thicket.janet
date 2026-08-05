@@ -100,13 +100,20 @@
          (def {:peers peers :name name} state)
          (var failed false)
          (each peer peers
+           (produce (diag "connect-attempt name=" name " peer=" peer
+                          " client=" (boolean (table? (state peer)))))
            (var tries 0)
            (while
              (match [(protect (:open (state peer))) tries]
-               [[true _] _] (produce (log name " connected to " peer))
+               [[true _] _] (produce (diag "connect-ok name=" name
+                                            " peer=" peer " tries=" tries)
+                                         (log name " connected to " peer))
                [[false err] 10] (do
                                   (set failed true)
                                   (produce
+                                    (diag "connect-fail name=" name
+                                          " peer=" peer " tries=" tries
+                                          " err=" err)
                                     (log name " cannot connect to " peer ": " err)))
                true (peer/reset-client state peer))
              (ev/sleep (* (++ tries) 0.1))))
@@ -144,7 +151,9 @@
     (fn [_ state _]
       (def {:name name} state)
       (default tenant ((>or (=<> :guards) (=<> :name)) state))
-      [(log tenant " registers on " peer)
+      [(diag "register name=" name " tenant=" tenant " peer=" peer
+             " target-present=" (boolean (state peer)))
+       (log tenant " registers on " peer)
        (^session/cap (:register (state peer) name tenant))])
     (. "register " peer)))
 
