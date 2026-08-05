@@ -68,6 +68,33 @@
         (if (present? after) (produce ;after))))
     "end session"))
 
+(defn ^session/start
+  "Publishes a session and waits until Tree has committed it.
+
+  A successful login must not raise the guarded dashboard in the same
+  transaction that asks Tree to save the session.  Registration otherwise
+  captures the old empty capability and the first requests receive 401."
+  [session & after]
+  (make-watch
+    (fn [_ state _]
+      (producer
+        (def {:tree tree :name name} state)
+        (def tenant (or (state :tenant) name))
+        (produce (diag "session-start-begin name=" name " tenant=" tenant
+                       " length=" (length session)))
+        (protect (:session/new tree tenant session))
+        (var settled (session/settled? tree tenant session))
+        (var tries 0)
+        (while (and (not settled) (< tries 50))
+          (ev/sleep 0.02)
+          (++ tries)
+          (set settled (session/settled? tree tenant session)))
+        (produce (diag "session-start-settled name=" name " tenant=" tenant
+                       " settled=" settled " tries=" tries))
+        (if settled
+          (produce (^tenant/refresh-view :cap/session) ;after))))
+    "start session"))
+
 (defn- guarded/surface
   ```
   The surface `guarded` presents to the outside: the membrane node it
@@ -446,8 +473,8 @@
                                      cookie-host ";")))))
           (:flush conn))
         (ev/give-supervisor :close conn)
-        (produce (^session/new sk))
-        (produce (^aether/spawn guards "") (^place/leave guards))))
+        (produce (^session/start sk
+                  (^aether/spawn guards "") (^place/leave guards)))))
     (do
       (produce (diag "auth-failure name=" (view :name)))
       (http/html-success-resp (page @[failure <form/>])))))
