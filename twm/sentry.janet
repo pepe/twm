@@ -214,11 +214,18 @@
     (space/let-go (view :space))))
 
 (defn- logout/response
-  "Returns the redirect only after logout has settled on Tree."
+  "Returns a readiness page only after logout has settled on Tree."
   [done sent]
   (fn [conn]
     (ev/take done)
-    (protect (:write conn (http/see-other "/")))
+    (protect
+      (:write conn
+              (http/html-success-resp
+                (hg/html
+                  @[hg/doctype-html
+                    [:html
+                     [:body
+                      [:p "Logged out." (<script/redirect/> "/")]]]]))))
     (protect (:flush conn))
     (:give sent true)
     (ev/give-supervisor :close conn)))
