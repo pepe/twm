@@ -44,7 +44,7 @@
               t (math/floor now)
               p (string (mod now 1))]
           (eprin (dt/format-date-time t) "." (slice p 2 7) " - DIAG ")
-          (eprint ;msg))) "diagnostic"))
+          (eprint ;msg))) "diagnostic")))
 
 (defn logr
   "Create logging event from the message `msg`."

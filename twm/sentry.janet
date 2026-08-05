@@ -260,9 +260,9 @@
   (def sent (ev/chan 1))
   (def settled (logout/settled done))
   (produce (diag "logout-request name=" (view :name)
-                 " guarded=" (boolean (view :guards))
-                 " own-space=" (boolean (view :space))
-                 " session-cap=" (boolean (view :cap/session))))
+                 " guarded=" (if (view :guards) true false)
+                 " own-space=" (if (view :space) true false)
+                 " session-cap=" (if (view :cap/session) true false)))
   (produce
     # Close the local capability first, so in-flight requests cannot render
     # the old dashboard while Tree is applying the logout.
@@ -300,8 +300,8 @@
     (fn check-session [req]
       (define :view)
       (produce (diag "session-check name=" (view :name)
-                     " cookie-present=" (boolean (get-in req [:headers "Cookie" "session"]))
-                     " cap-present=" (boolean (view :cap/session))))
+                     " cookie-present=" (if (get-in req [:headers "Cookie" "session"]) true false)
+                     " cap-present=" (if (view :cap/session) true false)))
       (if-let [ck ((view :cap/session) req)]
         (next-middleware req)
         (http/not-authorized)))))
@@ -420,7 +420,7 @@
   (define :conn)
   (def {:page page :success success :failure failure} (view :templates))
   (produce (diag "auth-request name=" (view :name)
-                 " secret-present=" (boolean (view :secret))
+                 " secret-present=" (if (view :secret) true false)
                  " body-secret-present=" (present-string? (get body :secret ""))))
   (if-let [sec (view :secret)
            bsec (get body :secret "")
