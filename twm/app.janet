@@ -496,10 +496,10 @@ dynamics as set by *rpc-defines*.```
        (producer
          (var pending (length servers))
          (def bound
-           (make-watch
-             (fn [_ _ _]
-               (-- pending)
-               nil)))
+           (make-effect
+             (fn [&]
+               (-- pending))
+             "RPC bound"))
          (if (zero? pending)
            (produce ;(if (indexed? succ) succ [succ]))
            (do
