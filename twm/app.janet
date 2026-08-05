@@ -758,11 +758,11 @@ dynamics as set by *rpc-defines*.```
   moment instead only moves the guess: a symbiont is usually ready in a
   tenth of a second and has been seen to take four.
 
-  Asking turns the gap into a pause of exactly its own length. Any answer
-  will do, refusal included -- what is being asked is whether anyone is
-  standing there, not what they would say. It gives up asking after half a
-  minute and goes anyway, because a door that never opens is better seen
-  than waited on forever.
+  Asking turns the gap into a pause of exactly its own length. A reachable
+  dashboard that still answers 401 is not ready: its session capability has
+  not arrived yet. The probe therefore waits for a non-error, non-401 response.
+  It gives up asking after half a minute and goes anyway, because a door that
+  never opens is better seen than waited on forever.
   ```
   [&opt address]
   (default address "/")
@@ -770,8 +770,12 @@ dynamics as set by *rpc-defines*.```
    (hg/raw
      (. ``var mtbDoor = "`` address ``";
           function mtbAnswered() {
-            return fetch(mtbDoor, {mode: "no-cors", cache: "no-store"})
-                     .then(function () { return true; })
+            return fetch(mtbDoor, {cache: "no-store"})
+                     .then(function (response) {
+                       return response.status >= 200 &&
+                              response.status < 400 &&
+                              response.status !== 401;
+                     })
                      .catch(function () { return false; });
           }
           function mtbEnter(waited) {
