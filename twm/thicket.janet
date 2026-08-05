@@ -1,5 +1,19 @@
 (import ./app :prefix "" :export true)
 
+(defn- peer/reset-client
+  "Replaces a client after a failed open so retries start cleanly."
+  [state peer]
+  (when-let [old (state peer)]
+    (when (table? old)
+      (protect (:close old))
+      (put state peer
+           (make rpc/Client
+                 :host (old :host)
+                 :port (old :port)
+                 :psk (old :psk)
+                 :name (old :name)))))
+  state)
+
 (defn ^peer/connect
   "Connects to one peer"
   [peer & succ]
@@ -28,7 +42,7 @@
              [[true _] _] (produce (log name " connected to " peer))
              [[false err] 10]
              (produce (log name " cannot connect to " peer ": " err))
-             true)
+             true (peer/reset-client state peer))
            (ev/sleep (* (++ tries) 0.1)))
          (if (present? succ) (produce ;succ))))}
     (. "connect peer " peer)))
@@ -58,7 +72,7 @@
              [[true _] _] (produce (log name " connected to " peer))
              [[false err] 10]
              (produce (log name " cannot connect to " peer ": " err))
-             true)
+             true (peer/reset-client state peer))
            (ev/sleep (* (++ tries) 0.1)))
          (if succ (produce ;succ))))}
     (. "connect peer " peer)))
@@ -93,7 +107,7 @@
                                   (set failed true)
                                   (produce
                                     (log name " cannot connect to " peer ": " err)))
-               true)
+               true (peer/reset-client state peer))
              (ev/sleep (* (++ tries) 0.1))))
          (if failed (produce fail) (produce succ))))}
     "connect peers"))
