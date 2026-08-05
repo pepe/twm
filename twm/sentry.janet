@@ -207,6 +207,12 @@
       (:give done true))
     "logout settled"))
 
+(defn- handover/space
+  "Releases only a guarded membrane space, never the sentry itself."
+  [view]
+  (when (view :guards)
+    (space/let-go (view :space))))
+
 (defn- logout/response
   "Returns the redirect only after logout has settled on Tree."
   [done sent]
@@ -352,7 +358,7 @@
     (if resume
       (http/html-success-resp (page (resume guards)))
       (do
-        (if-let [space (view :space)] (space/let-go space))
+        (handover/space view)
         (protect
           (:write conn
                   (http/html-success-resp
@@ -375,7 +381,7 @@
   (def {:guards guards :address address} view)
   (if-let [ck ((view :cap/session) req)]
     (do
-      (if-let [space (view :space)] (space/let-go space))
+      (handover/space view)
       (protect
         (:write conn
                 (http/html-success-resp
@@ -400,7 +406,7 @@
            _ (pwhash/verify sec bsec key)]
     (let [sk (derive-from key)]
       (fn [conn]
-        (if-let [space (view :space)] (space/let-go space))
+        (handover/space view)
         (def resp
           (page @[(success guards) (<script/redirect/> address)]))
         (protect
@@ -431,7 +437,7 @@
   (def {:guards guards :address address :tenant/address home} view)
   (if-let [ck ((view :cap/session) req)]
     (do
-      (if-let [space (view :space)] (space/let-go space))
+      (handover/space view)
       (protect
         (:write conn
                 (http/html-success-resp
