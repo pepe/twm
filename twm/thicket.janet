@@ -84,7 +84,8 @@
   (make-event
     {:update
      (fn [_ state]
-       (def {:psk psk :name name :peers peers} state)
+       (def {:psk psk :name name :peers configured-peers} state)
+       (def peers (or configured-peers (when (state :tree) [:tree])))
        (each peer peers
          (def url (state peer))
          (unless (table? url)
