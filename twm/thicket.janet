@@ -21,9 +21,13 @@
          (var failed false)
          (var tries 0)
          (while
+           # Giving up says why. A peer the thicket cannot reach is one it
+           # cannot tell anything afterwards, and "cannot connect" without
+           # a reason is the kind of silence that costs days.
            (match [(protect (:open (state peer))) tries]
              [[true _] _] (produce (log name " connected to " peer))
-             [[false _] 10] (produce (log name " cannot connect to " peer "."))
+             [[false err] 10]
+             (produce (log name " cannot connect to " peer ": " err))
              true)
            (ev/sleep (* (++ tries) 0.1)))
          (if (present? succ) (produce ;succ))))}
@@ -52,7 +56,8 @@
          (while
            (match [(protect (:open (state peer))) tries]
              [[true _] _] (produce (log name " connected to " peer))
-             [[false _] 10] (produce (log name " cannot connect to " peer "."))
+             [[false err] 10]
+             (produce (log name " cannot connect to " peer ": " err))
              true)
            (ev/sleep (* (++ tries) 0.1)))
          (if succ (produce ;succ))))}
@@ -84,9 +89,10 @@
            (while
              (match [(protect (:open (state peer))) tries]
                [[true _] _] (produce (log name " connected to " peer))
-               [[false _] 10] (do
-                                (set failed true)
-                                (produce (log name " cannot connect to " peer ".")))
+               [[false err] 10] (do
+                                  (set failed true)
+                                  (produce
+                                    (log name " cannot connect to " peer ": " err)))
                true)
              (ev/sleep (* (++ tries) 0.1))))
          (if failed (produce fail) (produce succ))))}
