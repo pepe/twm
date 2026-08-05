@@ -760,9 +760,9 @@ dynamics as set by *rpc-defines*.```
 
   Asking turns the gap into a pause of exactly its own length. A reachable
   dashboard that still answers 401 is not ready: its session capability has
-  not arrived yet. The probe therefore waits for a non-error, non-401 response.
-  It gives up asking after half a minute and goes anyway, because a door that
-  never opens is better seen than waited on forever.
+  not arrived yet. The probe therefore waits for a non-error, non-401 response,
+  while including the current session cookie. A short grace period prevents a
+  capability push that is merely slow from trapping the user on the sentry.
   ```
   [&opt address]
   (default address "/")
@@ -770,17 +770,20 @@ dynamics as set by *rpc-defines*.```
    (hg/raw
      (. ``var mtbDoor = "`` address ``";
           function mtbAnswered() {
-            return fetch(mtbDoor, {cache: "no-store"})
+            return fetch(mtbDoor, {cache: "no-store", credentials: "include"})
                      .then(function (response) {
-                       return response.status >= 200 &&
-                              response.status < 400 &&
-                              response.status !== 401;
+                       return {reachable: true,
+                               ready: response.status >= 200 &&
+                                      response.status < 400 &&
+                                      response.status !== 401};
                      })
-                     .catch(function () { return false; });
+                     .catch(function () { return {reachable: false, ready: false}; });
           }
           function mtbEnter(waited) {
             mtbAnswered().then(function (answered) {
-              if (answered || waited >= 30000) {
+              if (answered.ready ||
+                  (answered.reachable && waited >= 5000) ||
+                  waited >= 30000) {
                 document.location = mtbDoor;
               } else {
                 setTimeout(function () { mtbEnter(waited + 150); }, 150);
