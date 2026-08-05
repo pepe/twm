@@ -101,7 +101,7 @@
          (var failed false)
          (each peer peers
            (produce (diag "connect-attempt name=" name " peer=" peer
-                          " client=" (if (table? (state peer)) true false)))
+                          " client=" (truthy? (table? (state peer)))))
            (var tries 0)
            (while
              (match [(protect (:open (state peer))) tries]
@@ -152,7 +152,7 @@
       (def {:name name} state)
       (default tenant ((>or (=<> :guards) (=<> :name)) state))
       [(diag "register name=" name " tenant=" tenant " peer=" peer
-             " target-present=" (if (state peer) true false))
+             " target-present=" (truthy? (state peer)))
        (log tenant " registers on " peer)
        (^session/cap (:register (state peer) name tenant))])
     (. "register " peer)))
