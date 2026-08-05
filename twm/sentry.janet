@@ -199,6 +199,33 @@
   (if-let [space (place/of state name)] (space/let-go space))
   [(^aether/left name) Exit])
 
+(defn- logout/settled
+  "Returns an event that wakes a waiting logout response."
+  [done]
+  (make-effect
+    (fn [_ _ _]
+      (:give done true))
+    "logout settled"))
+
+(defn- logout/response
+  "Returns the redirect only after logout has settled on Tree."
+  [done sent]
+  (fn [conn]
+    (ev/take done)
+    (protect (:write conn (http/see-other "/")))
+    (protect (:flush conn))
+    (:give sent true)
+    (ev/give-supervisor :close conn)))
+
+(defn- logout/standdown-after
+  "Waits for the logout response before exiting the symbiont."
+  [sent]
+  (make-watch
+    (producer
+      (ev/take sent)
+      (produce StandDown))
+    "stand down after logout"))
+
 (defh /logout
   ```
   Clears the current session.
@@ -210,21 +237,33 @@
   ```
   []
   (define :view)
+  (def done (ev/chan 1))
+  (def sent (ev/chan 1))
+  (def settled (logout/settled done))
   (produce
+    # Close the local capability first, so in-flight requests cannot render
+    # the old dashboard while Tree is applying the logout.
+    (^session/cap false)
     (if (view :space)
       # A guardian keeps standing, so nobody takes the door back and reads
       # the capability on the way in. It has to read it itself, and by
       # asking rather than by being told: the tree's push reaches whoever
       # it can dial, and a guardian it cannot dial would go on admitting
       # the session it was holding.
-      (^session/end (^tenant/refresh-view :cap/session))
-      (^session/end StandDown)))
-  (http/see-other "/"))
+      (^session/end (^tenant/refresh-view :cap/session) settled)
+      # Signal the response before standing down: StandDown exits this
+      # manager after closing the dashboard's address.
+      (^session/end (^tenant/refresh-view :cap/session)
+                    settled
+                    (logout/standdown-after sent))))
+  (logout/response done sent))
 
 (defn =>session/?eq
-  "Creates session check function from `key`"
+  "Creates a session check function from a non-empty session `key`."
   [key]
-  (if key
+  # The empty string is the logout sentinel. Janet considers it truthy,
+  # so checking only `key` would let an empty Cookie match an ended session.
+  (if (present-string? key)
     (=<> :headers "Cookie" "session" (?eq key))
     (>base false)))
 
@@ -450,8 +489,9 @@
   It announces itself on the Aether as every other symbiont does. A sentry
   that hands its place over by dying had nothing to announce and no one to
   hear it; one that outlives the handover is a peer the demiurge has to be
-  able to reach, and the demiurge learns an address is answering only from
-  the readiness that crosses the Aether.
+  able to reach. The supplied `start` event owns the final readiness event,
+  so registration and the Aether announcement happen only after its RPC
+  listeners are bound.
   ```
   [config templates rpc-funcs start & before]
   (-> config
@@ -460,8 +500,7 @@
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
                  HTTP
-                 (^connect-peers start Exit)
-                 AetherReady)
+                 (^connect-peers start Exit))
       :await))
 
 (defmacro main

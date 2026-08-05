@@ -60,11 +60,11 @@
   (sentry/=>session/?eq session))
 
 (defn run
-  "Runs Tree setup events followed by the shared RPC and readiness lifecycle."
+  "Runs Tree setup, then announces readiness after its RPC listener binds."
   [config & setup]
   (-> config
       (make-manager on-error)
-      (:transact ;setup RPC AetherReady)
+      (:transact ;setup (^rpc/start AetherReady))
       :await))
 
 (defmacro main

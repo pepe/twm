@@ -160,11 +160,19 @@
   [& colls]
   (make-update
     (fn [_ state]
-      (def {:tree tree :tenant tenant} state)
-      (each place [state ;(values (get state :spaces {}))]
-        (if-let [view (place :view)]
-          (each coll colls
-            (put view coll (coll tree tenant))))))
+      (def {:tree tree :tenant tenant :name name} state)
+      # Tree's tenant RPC schema is keyword-only. Older or hand-built
+      # configurations may carry a string, and guardians may have no
+      # explicit tenant while they are being assembled.
+      (def raw-tenant (or tenant name))
+      (def rpc-tenant (if (and raw-tenant (not (keyword? raw-tenant)))
+                        (keyword raw-tenant)
+                        raw-tenant))
+      (when rpc-tenant
+        (each place [state ;(values (get state :spaces {}))]
+          (if-let [view (place :view)]
+            (each coll colls
+              (put view coll (coll tree rpc-tenant)))))))
     (. "refresh view " ;colls)))
 
 (defn ^peer/refresh-view

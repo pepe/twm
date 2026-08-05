@@ -471,7 +471,7 @@ dynamics as set by *rpc-defines*.```
 
 (defn ^space/rpc
   "Event running the mycelium server of one living `space`."
-  [space psk deb]
+  [space psk deb &opt after-start]
   (def {:rpc {:url url :functions functions} :name name} space)
   (def fns
     (merge
@@ -481,7 +481,37 @@ dynamics as set by *rpc-defines*.```
              Stop])
        :ping (fnr :ping [] :pong)}
       functions))
-  (^rpc url fns psk name deb space))
+  (^rpc url fns psk name deb space after-start))
+
+(defn ^rpc/start
+  "Starts every RPC listener and produces `succ` only after all bind."
+  [succ &opt fail]
+  (default fail Exit)
+  (make-event
+    {:watch
+     (fn [_ state _]
+       (def {:psk psk :debug deb} state)
+       (def servers
+         (seq [space :in (spaces state) :when (space :rpc)] space))
+       (producer
+         (var pending (length servers))
+         (def bound
+           (make-watch
+             (fn [_ _ _]
+               (-- pending)
+               nil)))
+         (if (zero? pending)
+           (produce ;(if (indexed? succ) succ [succ]))
+           (do
+             (produce ;(map |(^space/rpc $ psk deb bound) servers))
+             (var waited 0)
+             (while (and (pos? pending) (< waited 500))
+               (ev/sleep 0.01)
+               (++ waited))
+             (if (zero? pending)
+               (produce ;(if (indexed? succ) succ [succ]))
+               (produce fail))))))}
+    "start RPC"))
 
 (define-watch RPC
   "Creates a producer with a running RPC server for every living space."
