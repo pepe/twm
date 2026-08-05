@@ -85,7 +85,7 @@
     {:update
      (fn [_ state]
        (def {:psk psk :name name :peers configured-peers} state)
-       (def peers (or configured-peers (when (state :tree) [:tree])))
+       (def peers configured-peers)
        (each peer peers
          (def url (state peer))
          (unless (table? url)
@@ -99,9 +99,6 @@
        (producer
          (def {:peers peers :name name} state)
          (var failed false)
-         # Peers are released together; give their listeners a moment to
-         # bind before the first synchronous socket connect.
-         (ev/sleep 0.2)
          (each peer peers
            (produce (diag "connect-attempt name=" name " peer=" peer
                           " client=" (truthy? (table? (state peer)))))

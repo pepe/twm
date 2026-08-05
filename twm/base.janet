@@ -39,7 +39,7 @@
   [& msg]
   (make-effect
     (fn diagnostic [_ state _]
-      (when (or (state :log) (state :debug) (state :diagnostic))
+      (when (state :diagnostic)
         (let [now (os/clock)
               t (math/floor now)
               p (string (mod now 1))]
