@@ -419,6 +419,9 @@
   (define :view)
   (define :conn)
   (def {:page page :success success :failure failure} (view :templates))
+  (produce (diag "auth-request name=" (view :name)
+                 " secret-present=" (boolean (view :secret))
+                 " body-secret-present=" (present-string? (get body :secret ""))))
   (if-let [sec (view :secret)
            bsec (get body :secret "")
            {:cookie-host cookie-host :key key
@@ -426,6 +429,9 @@
            _ (pwhash/verify sec bsec key)]
     (let [sk (derive-from key)]
       (fn [conn]
+        (produce (diag "auth-success name=" (view :name)
+                       " guards=" guards " cookie-host=" cookie-host
+                       " session-length=" (length sk)))
         (handover/space view)
         (def resp
           (page @[(success guards) (<script/redirect/> address)]))
@@ -442,7 +448,9 @@
         (ev/give-supervisor :close conn)
         (produce (^session/new sk))
         (produce (^aether/spawn guards "") (^place/leave guards))))
-    (http/html-success-resp (page @[failure <form/>]))))
+    (do
+      (produce (diag "auth-failure name=" (view :name)))
+      (http/html-success-resp (page @[failure <form/>])))))
 
 (defh inhabited
   ```
