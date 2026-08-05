@@ -758,38 +758,18 @@ dynamics as set by *rpc-defines*.```
   moment instead only moves the guess: a symbiont is usually ready in a
   tenth of a second and has been seen to take four.
 
-  Asking turns the gap into a pause of exactly its own length. A reachable
-  dashboard that still answers 401 is not ready: its session capability has
-  not arrived yet. The probe therefore waits for a non-error, non-401 response,
-  while including the current session cookie. A short grace period prevents a
-  capability push that is merely slow from trapping the user on the sentry.
+  The handover page waits one second for the receiving symbiont to take its
+  door, then enters it. There is no browser-side polling here.
   ```
   [&opt address]
   (default address "/")
   [:script
    (hg/raw
      (. ``var mtbDoor = "`` address ``";
-          function mtbAnswered() {
-            var controller = new AbortController();
-            var timeout = setTimeout(function () { controller.abort(); }, 500);
-            return fetch(mtbDoor, {cache: "no-store", credentials: "include",
-                                   signal: controller.signal})
-                     .then(function (response) {
-                       return response.status >= 200 && response.status < 400;
-                     })
-                     .catch(function () { return false; })
-                     .finally(function () { clearTimeout(timeout); });
+          function mtbEnter() {
+            setTimeout(function () { document.location = mtbDoor; }, 1000);
           }
-          function mtbEnter(waited) {
-            mtbAnswered().then(function (answered) {
-              if (answered || waited >= 30000) {
-                document.location = mtbDoor;
-              } else {
-                setTimeout(function () { mtbEnter(waited + 150); }, 150);
-              }
-            });
-          }
-          mtbEnter(0);``))])
+          mtbEnter();``))])
 
 (defn sanitize-nl
   "Replaces \n for <br>"
