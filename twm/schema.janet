@@ -28,7 +28,8 @@
 
 (def?! config/runtime
   {:debug boolean?
-   :log boolean?})
+   :log boolean?
+   :diagnostic (?optional boolean?)})
 
 (def?! config/deploy
   dictionary?
