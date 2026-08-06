@@ -1,12 +1,12 @@
 (import ./thicket :prefix "")
 
 (defn run
-  "Runs a symbiont lifecycle around its project-specific setup and start events."
+  "Connects peers before announcing a symbiont ready for public handover."
   [config start & before]
   (-> config
       (make-manager on-error)
       (:transact ;before
-                 (^connect-peers start Exit))
+                 (^connect-peers @[start AetherReady] Exit))
       :await))
 
 (defmacro main

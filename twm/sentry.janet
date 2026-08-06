@@ -555,9 +555,9 @@
   It announces itself on the Aether as every other symbiont does. A sentry
   that hands its place over by dying had nothing to announce and no one to
   hear it; one that outlives the handover is a peer the demiurge has to be
-  able to reach. The supplied `start` event owns the final readiness event,
-  so registration and the Aether announcement happen only after its RPC
-  listeners are bound.
+  able to reach. It announces itself only after its peer clients connect, so
+  a symbiont raised from its handover cannot answer before it can validate a
+  session with Tree.
   ```
   [config templates rpc-funcs start & before]
   (-> config
@@ -566,7 +566,7 @@
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
                  HTTP
-                 (^connect-peers start Exit))
+                 (^connect-peers @[start AetherReady] Exit))
       :await))
 
 (defmacro main
