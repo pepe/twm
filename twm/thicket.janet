@@ -77,9 +77,16 @@
          (if succ (produce ;succ))))}
     (. "connect peer " peer)))
 
+(defn ^after
+  "Makes one Event that returns `first` followed by `second`."
+  [first second]
+  (make-watch
+    (fn [&] @[first second])
+    "after"))
+
 (defn ^connect-peers
-  "Connects to all peers, then emits `succ` and an optional `after` event."
-  [succ &opt fail after]
+  "Connects to all the peers"
+  [succ &opt fail]
   (default fail succ)
   (make-event
     {:update
@@ -120,11 +127,7 @@
                                     (log name " cannot connect to " peer ": " err)))
                true (peer/reset-client state peer))
              (ev/sleep (* (++ tries) 0.1))))
-         (if failed
-           (produce fail)
-           (if after
-             (produce succ after)
-             (produce succ)))))}
+         (if failed (produce fail) (produce succ))))}
     "connect peers"))
 
 (defn ^session/cap

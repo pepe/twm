@@ -563,7 +563,7 @@
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
                  HTTP
-                 (^connect-peers start Exit AetherReady))
+                 (^connect-peers (^after start AetherReady) Exit))
       :await))
 
 (defmacro main
