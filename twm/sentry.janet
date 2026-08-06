@@ -227,7 +227,7 @@
     (space/let-go (view :space))))
 
 (defn- logout/response
-  "Returns a styled readiness page only after logout has settled on Tree."
+  "Returns a Missing.css readiness page only after logout has settled on Tree."
   [done sent]
   (fn [conn]
     (ev/take done)
@@ -240,17 +240,23 @@
                      [:head
                       [:title "Logged out · MTB"]
                       [:meta {:name "viewport"
-                              :content "width=device-width, initial-scale=1"}]]
-                     [:body {:style "align-items:center;background:#f5f4ef;color:#24313d;display:flex;font-family:system-ui,sans-serif;justify-content:center;margin:0;min-height:100vh;padding:1.5rem"}
-                      [:main {:style "background:#fff;border:1px solid #d9d6ca;border-radius:1rem;box-shadow:0 1rem 3rem #24313d1f;max-width:28rem;padding:2.5rem;text-align:center;width:100%"}
-                       [:p {:style "color:#61707c;font-size:.8rem;font-weight:700;letter-spacing:.12em;margin:0 0 .75rem;text-transform:uppercase"}
-                        "MTB"]
-                       [:h1 {:style "font-size:2rem;margin:0 0 .75rem"} "Logged out"]
-                       [:p {:style "color:#52616d;line-height:1.5;margin:0"}
+                              :content "width=device-width, initial-scale=1"}]
+                      [:link {:rel "stylesheet"
+                              :href "https://unpkg.com/missing.css@1.1.1/dist/missing.css"}]]
+                     [:body
+                      [:header {:class "center"}
+                       [:h1 "Welcome to MTB."]]
+                      [:main {:class "center"}
+                       [:h1 "Logged out"]
+                       [:p
                         "Your session has ended safely."]
-                       [:p {:style "color:#78858f;font-size:.95rem;margin:1.5rem 0 0"}
+                       [:p
                         "Returning you to the entrance…"]
-                       (<script/redirect/> "/")]]]]))))
+                       (<script/redirect/> "/")]
+                      [:footer "mtb.pan.earth"]
+                      ]
+                     ]
+                    ]))))
     (protect (:flush conn))
     (:give sent true)
     (ev/give-supervisor :close conn)))
