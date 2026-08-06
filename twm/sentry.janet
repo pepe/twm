@@ -227,14 +227,11 @@
     (space/let-go (view :space))))
 
 (defn- handover/after-response
-  "Yields the listener only after the browser's one-second redirect window."
+  "Releases the listener only after the sentry response has been written."
   [view guards]
-  (make-watch
-    (fn [&]
-      (producer
-        (ev/sleep 1)
-        (handover/space view)
-        (produce (^aether/spawn guards "") (^place/leave guards))))
+  (make-event
+    {:effect (fn [&] (handover/space view))
+     :watch (fn [&] @[(^aether/spawn guards "") (^place/leave guards)])}
     "handover after response"))
 
 (defn- logout/response
@@ -439,7 +436,7 @@
         (:write conn
                 (http/html-success-resp
                   (page @[(success guards) (<script/redirect/> address)])
-                    <handover/>))
+                  <handover/>))
         (:flush conn))
       (produce (handover/after-response view guards))
       {})
@@ -464,12 +461,10 @@
         (produce (diag "auth-success name=" (view :name)
                        " guards=" guards " cookie-host=" cookie-host
                        " session-length=" (length sk)))
-        (def resp
-          (page @[(success guards) (<script/redirect/> address)]))
         (protect
           (:write conn
                   (http/html-success-resp
-                    resp
+                    (page @[(success guards) (<script/redirect/> address)])
                     (merge <handover/>
                            (http/cookie
                              "session"
@@ -499,7 +494,7 @@
         (:write conn
                 (http/html-success-resp
                   (page @[(success guards) (<script/redirect/> address)])
-                    <handover/>))
+                  <handover/>))
         (:flush conn))
       (produce (handover/after-response view guards))
       {})
