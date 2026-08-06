@@ -217,14 +217,21 @@
   ```
   Releases only a guarded membrane space, never the sentry itself.
 
-  The handover response must be flushed and its close queued before this
-  runs. Vacating the listener wakes its accepting fiber; allowing that
-  failure to reach the HTTP supervisor while the response is still being
-  written can close the request before its headers leave the sentry.
+  The handover response must be flushed and closed before this runs.
+  Vacating the listener wakes its accepting fiber; doing that while the
+  response is still being written can close the request before its headers
+  leave the sentry.
   ```
   [view]
   (when (view :guards)
     (space/let-go (view :space))))
+
+(defn- close/handover
+  "Closes a completed sentry response before releasing Dashboard's listener."
+  [conn]
+  (def closed (ev/chan 1))
+  (ev/give-supervisor :close conn closed)
+  (ev/take closed))
 
 (defn- logout/response
   "Returns a Missing.css readiness page only after logout has settled on Tree."
@@ -409,7 +416,7 @@
                     (page @[(success guards) (<script/redirect/> address)])
                     <handover/>))
           (:flush conn))
-        (ev/give-supervisor :close conn)
+        (close/handover conn)
         (handover/space view)
         (produce (^aether/spawn guards "") (^place/leave guards))
         {}))
@@ -432,7 +439,7 @@
                   (page @[(success guards) (<script/redirect/> address)])
                     <handover/>))
         (:flush conn))
-      (ev/give-supervisor :close conn)
+      (close/handover conn)
       (handover/space view)
       (produce (^aether/spawn guards "") (^place/leave guards))
       {})
@@ -469,7 +476,7 @@
                              (string sk "; Secure; HttpOnly; Domain="
                                      cookie-host ";")))))
           (:flush conn))
-        (ev/give-supervisor :close conn)
+        (close/handover conn)
         (handover/space view)
         (produce (^session/new sk))
         (produce (^aether/spawn guards "") (^place/leave guards))))
@@ -496,7 +503,7 @@
                   (page @[(success guards) (<script/redirect/> address)])
                     <handover/>))
         (:flush conn))
-      (ev/give-supervisor :close conn)
+      (close/handover conn)
       (handover/space view)
       (produce (^aether/spawn guards "") (^place/leave guards))
       {})
