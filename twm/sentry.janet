@@ -217,7 +217,7 @@
   ```
   Releases only a guarded membrane space, never the sentry itself.
 
-  The handover response must be flushed and closed before this runs.
+  The handover response must have its redirect window before this runs.
   Vacating the listener wakes its accepting fiber; doing that while the
   response is still being written can close the request before its headers
   leave the sentry.
@@ -226,12 +226,13 @@
   (when (view :guards)
     (space/let-go (view :space))))
 
-(defn- close/handover
-  "Closes a completed sentry response before releasing Dashboard's listener."
-  [conn]
-  (def closed (ev/chan 1))
-  (ev/give-supervisor :close conn closed)
-  (ev/take closed))
+(defn- handover/after-response
+  "Yields the listener only after the browser's one-second redirect window."
+  [view & events]
+  (producer
+    (ev/sleep 1)
+    (handover/space view)
+    (produce ;events)))
 
 (defn- logout/response
   "Returns a Missing.css readiness page only after logout has settled on Tree."
@@ -416,9 +417,8 @@
                     (page @[(success guards) (<script/redirect/> address)])
                     <handover/>))
           (:flush conn))
-        (close/handover conn)
-        (handover/space view)
-        (produce (^aether/spawn guards "") (^place/leave guards))
+        (produce (handover/after-response
+                   view (^aether/spawn guards "") (^place/leave guards)))
         {}))
     (http/html-success-resp
       (page @[(if (function? title) (title (human guards)) title)
@@ -439,9 +439,8 @@
                   (page @[(success guards) (<script/redirect/> address)])
                     <handover/>))
         (:flush conn))
-      (close/handover conn)
-      (handover/space view)
-      (produce (^aether/spawn guards "") (^place/leave guards))
+      (produce (handover/after-response
+                 view (^aether/spawn guards "") (^place/leave guards)))
       {})
     (http/see-other "/")))
 
@@ -476,10 +475,9 @@
                              (string sk "; Secure; HttpOnly; Domain="
                                      cookie-host ";")))))
           (:flush conn))
-        (close/handover conn)
-        (handover/space view)
         (produce (^session/new sk))
-        (produce (^aether/spawn guards "") (^place/leave guards))))
+        (produce (handover/after-response
+                   view (^aether/spawn guards "") (^place/leave guards)))))
     (do
       (produce (diag "auth-failure name=" (view :name)))
       (http/html-success-resp (page @[failure <form/>])))))
@@ -503,9 +501,8 @@
                   (page @[(success guards) (<script/redirect/> address)])
                     <handover/>))
         (:flush conn))
-      (close/handover conn)
-      (handover/space view)
-      (produce (^aether/spawn guards "") (^place/leave guards))
+      (produce (handover/after-response
+                 view (^aether/spawn guards "") (^place/leave guards)))
       {})
     (http/not-authorized (unauthorized guards home)
                          (http/content-type ".html"))))
