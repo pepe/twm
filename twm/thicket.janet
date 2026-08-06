@@ -77,13 +77,6 @@
          (if succ (produce ;succ))))}
     (. "connect peer " peer)))
 
-(defn ^after
-  "Makes one Event that returns `first` followed by `second`."
-  [first second]
-  (make-watch
-    (fn [&] @[first second])
-    "after"))
-
 (defn ^connect-peers
   "Connects to all the peers"
   [succ &opt fail]
@@ -106,9 +99,6 @@
        (producer
          (def {:peers peers :name name} state)
          (var failed false)
-         # Peers are released together; give their listeners a moment to
-         # bind before the first synchronous socket connect.
-         (ev/sleep 0.2)
          (each peer peers
            (produce (diag "connect-attempt name=" name " peer=" peer
                           " client=" (truthy? (table? (state peer)))))
@@ -137,13 +127,19 @@
   The capability is the tenant's, not any one place's, and a symbiont
   standing in several of a tenant's places must answer for all of them
   from the single push that carries it.
+
+  With `announce`, readiness is emitted from this event's watch, after
+  the capability update has reached every view. A peer therefore cannot
+  be treated as ready while its first request would still see no session.
   ```
-  [cap]
-  (make-update
-    (fn [_ state]
-      (each place [state ;(values (get state :spaces {}))]
-        (if-let [view (place :view)]
-          (put view :cap/session cap))))
+  [cap &opt announce]
+  (make-event
+    {:update
+     (fn [_ state]
+       (each place [state ;(values (get state :spaces {}))]
+         (if-let [view (place :view)]
+           (put view :cap/session cap))))
+     :watch (if announce AetherReady)}
     "save session"))
 
 (defn ^tenant/register
@@ -156,11 +152,10 @@
   would be answered by the risen symbiont from then on -- the guardian
   would keep serving on a capability nobody could tell it had expired.
 
-  `after` runs only after the returned session capability has been saved.
-  This lets a symbiont bind its HTTP listener after its first session view
-  exists, rather than answering the first request with the empty default.
+  `announce` asks the saved capability to report readiness only after its
+  update; it is used for a symbiont's first registration.
   ```
-  [peer &opt tenant & after]
+  [peer &opt tenant announce]
   (make-watch
     (fn [_ state _]
       (def {:name name} state)
@@ -168,8 +163,7 @@
       [(diag "register name=" name " tenant=" tenant " peer=" peer
              " target-present=" (truthy? (state peer)))
        (log tenant " registers on " peer)
-       (^session/cap (:register (state peer) name tenant))
-       ;after])
+       (^session/cap (:register (state peer) name tenant) announce)])
     (. "register " peer)))
 
 (defn ^register

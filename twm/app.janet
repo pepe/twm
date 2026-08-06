@@ -759,9 +759,7 @@ dynamics as set by *rpc-defines*.```
   tenth of a second and has been seen to take four.
 
   The handover page waits one second for the receiving symbiont to take its
-  door. It then probes the same-origin destination until it answers before
-  navigating, so a slow first boot never strands the visitor on a proxy
-  error page.
+  door, then enters it. There is no browser-side polling here.
   ```
   [&opt address]
   (default address "/")
@@ -769,17 +767,7 @@ dynamics as set by *rpc-defines*.```
    (hg/raw
      (. ``var mtbDoor = "`` address ``";
           function mtbEnter() {
-            window.setTimeout(function mtbProbe() {
-              fetch(mtbDoor, {cache: "no-store", credentials: "same-origin"})
-                .then(function (response) {
-                  if (response.ok) {
-                    window.location.replace(mtbDoor);
-                  } else {
-                    window.setTimeout(mtbProbe, 100);
-                  }
-                })
-                .catch(function () { window.setTimeout(mtbProbe, 100); });
-            }, 1000);
+            setTimeout(function () { document.location = mtbDoor; }, 1000);
           }
           mtbEnter();``))])
 

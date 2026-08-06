@@ -101,11 +101,16 @@
    :watch PullGetSHA})
 
 (defn ^peer/remove
-  "Removes peer from spawned"
+  "Removes a peer and the heartbeat state that belonged to its process."
   [peer]
   (make-update
     (fn [_ state]
-      (def {:view {:spawned spawned}} state)
+      (def {:view {:spawned spawned :misses misses :activity activity}} state)
+      # Heartbeats identify a process only by its peer name. Keeping either
+      # value after that process exits lets a replacement inherit an old
+      # timeout or missed-ping count while it is still booting.
+      (put misses peer nil)
+      (put activity peer nil)
       (when (spawned peer)
         (put spawned peer nil)
         (def ep (state peer))
@@ -361,9 +366,9 @@
 
 (define-watch CheckPeers
   ```
-  Restarts peers that missed three consecutive heartbeats, stops those gone
-  quieter than the thicket's patience, and raises again any peer the
-  thicket wants standing that is no longer there.
+  Restarts peers that missed three consecutive heartbeats, stops reached
+  peers that have gone quieter than the thicket's patience, and raises
+  again any peer the thicket wants standing that is no longer there.
 
   The last is not a nicety. A peer that dies is taken out of `:spawned`,
   and `PingPeers` only pings what is in it, so nothing else here would
@@ -374,15 +379,15 @@
   ```
   [_ {:view view :timeout timeout :autostart autostart} _]
   (def c @[])
-  ((=>
-     (<- c (=<> :misses pairs (>Y (=<> 1 (?gt 2)))
-                (>map (=<> 0 |[(^peer/clear $) (^peer/no-active $)
-                               (^peer/stop $) (^peer/run $)]))))
-     (<- c (=<> :activity pairs (>Y (=<> last |(- (os/time) $) (?gt timeout)))
-                (>map (=<> 0 |[(^peer/clear $) (^peer/no-active $)
-                               (^peer/stop $)]))))
-     (>base c))
-    view)
+  (each [peer missed] (pairs (view :misses))
+    (when (and (= :mycelium ((view :spawned) peer)) (> missed 2))
+      (array/push c [(^peer/clear peer) (^peer/no-active peer)
+                     (^peer/stop peer) (^peer/run peer)])))
+  (each [peer active] (pairs (view :activity))
+    (when (and (= :mycelium ((view :spawned) peer))
+               (> (- (os/time) active) timeout))
+      (array/push c [(^peer/clear peer) (^peer/no-active peer)
+                     (^peer/stop peer)])))
   (each peer (or autostart [])
     (unless (get-in view [:spawned peer])
       (array/push c [(log peer " is wanted standing and is not; raising it")

@@ -227,12 +227,10 @@
     (space/let-go (view :space))))
 
 (defn- handover/after-response
-  "Releases the listener only after the sentry response has been written."
+  "Releases and spawns only after a sentry response has been written."
   [view guards]
-  (make-event
-    {:effect (fn [&] (handover/space view))
-     :watch (fn [&] @[(^aether/spawn guards "") (^place/leave guards)])}
-    "handover after response"))
+  (handover/space view)
+  (produce (^aether/spawn guards "") (^place/leave guards)))
 
 (defn- logout/response
   "Returns a Missing.css readiness page only after logout has settled on Tree."
@@ -411,14 +409,15 @@
     (if resume
       (http/html-success-resp (page (resume guards)))
       (do
-        (protect
-          (:write conn
-                  (http/html-success-resp
-                    (page @[(success guards) (<script/redirect/> address)])
-                    <handover/>))
-          (:flush conn))
-        (produce (handover/after-response view guards))
-        {}))
+        (match
+          (protect
+            (:write conn
+                    (http/html-success-resp
+                      (page @[(success guards) (<script/redirect/> address)])
+                      <handover/>))
+            (:flush conn))
+          [true _] (do (handover/after-response view guards) {})
+          [false _] {})))
     (http/html-success-resp
       (page @[(if (function? title) (title (human guards)) title)
               <form/>]))))
@@ -432,14 +431,15 @@
   (def {:guards guards :address address} view)
   (if-let [ck ((view :cap/session) req)]
     (do
-      (protect
-        (:write conn
-                (http/html-success-resp
-                  (page @[(success guards) (<script/redirect/> address)])
-                  <handover/>))
-        (:flush conn))
-      (produce (handover/after-response view guards))
-      {})
+      (match
+        (protect
+          (:write conn
+                  (http/html-success-resp
+                    (page @[(success guards) (<script/redirect/> address)])
+                    <handover/>))
+          (:flush conn))
+        [true _] (do (handover/after-response view guards) {})
+        [false _] {}))
     (http/see-other "/")))
 
 (defh auth
@@ -461,18 +461,21 @@
         (produce (diag "auth-success name=" (view :name)
                        " guards=" guards " cookie-host=" cookie-host
                        " session-length=" (length sk)))
-        (protect
-          (:write conn
-                  (http/html-success-resp
-                    (page @[(success guards) (<script/redirect/> address)])
-                    (merge <handover/>
-                           (http/cookie
-                             "session"
-                             (string sk "; Secure; HttpOnly; Domain="
-                                     cookie-host ";")))))
-          (:flush conn))
-        (produce (^session/new sk))
-        (produce (handover/after-response view guards))))
+        (match
+          (protect
+            (:write conn
+                    (http/html-success-resp
+                      (page @[(success guards) (<script/redirect/> address)])
+                      (merge <handover/>
+                             (http/cookie
+                               "session"
+                               (string sk "; Secure; HttpOnly; Domain="
+                                       cookie-host ";")))))
+            (:flush conn))
+          [true _] (do
+                     (produce (^session/new sk))
+                     (handover/after-response view guards))
+          [false _] nil)))
     (do
       (produce (diag "auth-failure name=" (view :name)))
       (http/html-success-resp (page @[failure <form/>])))))
@@ -490,14 +493,15 @@
   (def {:guards guards :address address :tenant/address home} view)
   (if-let [ck ((view :cap/session) req)]
     (do
-      (protect
-        (:write conn
-                (http/html-success-resp
-                  (page @[(success guards) (<script/redirect/> address)])
-                  <handover/>))
-        (:flush conn))
-      (produce (handover/after-response view guards))
-      {})
+      (match
+        (protect
+          (:write conn
+                  (http/html-success-resp
+                    (page @[(success guards) (<script/redirect/> address)])
+                    <handover/>))
+          (:flush conn))
+        [true _] (do (handover/after-response view guards) {})
+        [false _] {}))
     (http/not-authorized (unauthorized guards home)
                          (http/content-type ".html"))))
 
@@ -546,9 +550,9 @@
   It announces itself on the Aether as every other symbiont does. A sentry
   that hands its place over by dying had nothing to announce and no one to
   hear it; one that outlives the handover is a peer the demiurge has to be
-  able to reach. It announces itself only after its peer clients connect, so
-  a symbiont raised from its handover cannot answer before it can validate a
-  session with Tree.
+  able to reach. The supplied `start` event owns the final readiness event,
+  so registration and the Aether announcement happen only after its RPC
+  listeners are bound.
   ```
   [config templates rpc-funcs start & before]
   (-> config
@@ -557,7 +561,7 @@
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
                  HTTP
-                 (^connect-peers (^after start AetherReady) Exit))
+                 (^connect-peers start Exit))
       :await))
 
 (defmacro main
