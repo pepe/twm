@@ -148,8 +148,12 @@
   moment the symbiont it guards rises, and a registration pointing there
   would be answered by the risen symbiont from then on -- the guardian
   would keep serving on a capability nobody could tell it had expired.
+
+  `after` runs only after the returned session capability has been saved.
+  This lets a symbiont bind its HTTP listener after its first session view
+  exists, rather than answering the first request with the empty default.
   ```
-  [peer &opt tenant]
+  [peer &opt tenant & after]
   (make-watch
     (fn [_ state _]
       (def {:name name} state)
@@ -157,7 +161,8 @@
       [(diag "register name=" name " tenant=" tenant " peer=" peer
              " target-present=" (truthy? (state peer)))
        (log tenant " registers on " peer)
-       (^session/cap (:register (state peer) name tenant))])
+       (^session/cap (:register (state peer) name tenant))
+       ;after])
     (. "register " peer)))
 
 (defn ^register
