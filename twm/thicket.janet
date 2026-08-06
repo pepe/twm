@@ -78,8 +78,8 @@
     (. "connect peer " peer)))
 
 (defn ^connect-peers
-  "Connects to all the peers"
-  [succ &opt fail]
+  "Connects to all peers, then emits `succ` and an optional `after` event."
+  [succ &opt fail after]
   (default fail succ)
   (make-event
     {:update
@@ -120,7 +120,11 @@
                                     (log name " cannot connect to " peer ": " err)))
                true (peer/reset-client state peer))
              (ev/sleep (* (++ tries) 0.1))))
-         (if failed (produce fail) (produce succ))))}
+         (if failed
+           (produce fail)
+           (if after
+             (produce succ after)
+             (produce succ)))))}
     "connect peers"))
 
 (defn ^session/cap

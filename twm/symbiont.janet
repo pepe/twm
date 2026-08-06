@@ -6,7 +6,7 @@
   (-> config
       (make-manager on-error)
       (:transact ;before
-                 (^connect-peers @[start AetherReady] Exit))
+                 (^connect-peers start Exit AetherReady))
       :await))
 
 (defmacro main
