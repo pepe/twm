@@ -311,7 +311,10 @@
               (log (or peer group) " exited with code " exit-code))
             (^peer/remove group)
             (^place/return group)))))
-    (. "run peer " peer)))
+    # `peer` defaults to `group` inside the producer, which is too late to
+    # name the event by: almost every caller passes only a group, and every
+    # one of those was reading back as "run peer " with nothing after it.
+    (. "run peer " (or peer group))))
 
 (define-event RunPeers
   "Runs peers event"
