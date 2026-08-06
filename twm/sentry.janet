@@ -214,13 +214,20 @@
     "logout settled"))
 
 (defn- handover/space
-  "Releases only a guarded membrane space, never the sentry itself."
+  ```
+  Releases only a guarded membrane space, never the sentry itself.
+
+  The handover response must be flushed and its close queued before this
+  runs. Vacating the listener wakes its accepting fiber; allowing that
+  failure to reach the HTTP supervisor while the response is still being
+  written can close the request before its headers leave the sentry.
+  ```
   [view]
   (when (view :guards)
     (space/let-go (view :space))))
 
 (defn- logout/response
-  "Returns a readiness page only after logout has settled on Tree."
+  "Returns a styled readiness page only after logout has settled on Tree."
   [done sent]
   (fn [conn]
     (ev/take done)
@@ -229,9 +236,21 @@
               (http/html-success-resp
                 (hg/html
                   @[hg/doctype-html
-                    [:html
-                     [:body
-                      [:p "Logged out." (<script/redirect/> "/")]]]]))))
+                    [:html {:lang "en"}
+                     [:head
+                      [:title "Logged out · MTB"]
+                      [:meta {:name "viewport"
+                              :content "width=device-width, initial-scale=1"}]]
+                     [:body {:style "align-items:center;background:#f5f4ef;color:#24313d;display:flex;font-family:system-ui,sans-serif;justify-content:center;margin:0;min-height:100vh;padding:1.5rem"}
+                      [:main {:style "background:#fff;border:1px solid #d9d6ca;border-radius:1rem;box-shadow:0 1rem 3rem #24313d1f;max-width:28rem;padding:2.5rem;text-align:center;width:100%"}
+                       [:p {:style "color:#61707c;font-size:.8rem;font-weight:700;letter-spacing:.12em;margin:0 0 .75rem;text-transform:uppercase"}
+                        "MTB"]
+                       [:h1 {:style "font-size:2rem;margin:0 0 .75rem"} "Logged out"]
+                       [:p {:style "color:#52616d;line-height:1.5;margin:0"}
+                        "Your session has ended safely."]
+                       [:p {:style "color:#78858f;font-size:.95rem;margin:1.5rem 0 0"}
+                        "Returning you to the entrance…"]
+                       (<script/redirect/> "/")]]]]))))
     (protect (:flush conn))
     (:give sent true)
     (ev/give-supervisor :close conn)))
@@ -378,7 +397,6 @@
     (if resume
       (http/html-success-resp (page (resume guards)))
       (do
-        (handover/space view)
         (protect
           (:write conn
                   (http/html-success-resp
@@ -386,6 +404,7 @@
                     <handover/>))
           (:flush conn))
         (ev/give-supervisor :close conn)
+        (handover/space view)
         (produce (^aether/spawn guards "") (^place/leave guards))
         {}))
     (http/html-success-resp
@@ -401,7 +420,6 @@
   (def {:guards guards :address address} view)
   (if-let [ck ((view :cap/session) req)]
     (do
-      (handover/space view)
       (protect
         (:write conn
                 (http/html-success-resp
@@ -409,6 +427,7 @@
                     <handover/>))
         (:flush conn))
       (ev/give-supervisor :close conn)
+      (handover/space view)
       (produce (^aether/spawn guards "") (^place/leave guards))
       {})
     (http/see-other "/")))
@@ -432,7 +451,6 @@
         (produce (diag "auth-success name=" (view :name)
                        " guards=" guards " cookie-host=" cookie-host
                        " session-length=" (length sk)))
-        (handover/space view)
         (def resp
           (page @[(success guards) (<script/redirect/> address)]))
         (protect
@@ -446,6 +464,7 @@
                                      cookie-host ";")))))
           (:flush conn))
         (ev/give-supervisor :close conn)
+        (handover/space view)
         (produce (^session/new sk))
         (produce (^aether/spawn guards "") (^place/leave guards))))
     (do
@@ -465,7 +484,6 @@
   (def {:guards guards :address address :tenant/address home} view)
   (if-let [ck ((view :cap/session) req)]
     (do
-      (handover/space view)
       (protect
         (:write conn
                 (http/html-success-resp
@@ -473,6 +491,7 @@
                     <handover/>))
         (:flush conn))
       (ev/give-supervisor :close conn)
+      (handover/space view)
       (produce (^aether/spawn guards "") (^place/leave guards))
       {})
     (http/not-authorized (unauthorized guards home)
