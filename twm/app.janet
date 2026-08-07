@@ -639,7 +639,17 @@ dynamics as set by *rpc-defines*.```
       "event: datastar-patch-elements\n"
       (if selector (string "data: selector " selector "\n"))
       (if mode (string "data: mode " mode "\n"))
-      "data: elements " elements "\n\n")))
+      # One `data:` line per line of markup. A field in an event stream
+      # ends at the newline, so elements carrying one -- a stylesheet, a
+      # script, anything preformatted -- would end the field early and
+      # leave the rest of themselves as stray lines. Datastar reads what it
+      # was given, which is a truncated element and some nonsense, and the
+      # selector it was told to replace is emptied rather than replaced.
+      (string/join
+        (map |(string "data: elements " $)
+             (string/split "\n" (string elements)))
+        "\n")
+      "\n\n")))
 
 (defn ds/patch-elements
   "Writes patch-elements SSE message to conn"

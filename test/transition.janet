@@ -39,6 +39,27 @@
   (assert (not (string/find "<script" body)) "with no script anywhere in it"))
 (end-suite)
 
+(start-suite :multiline-elements)
+# A field in an event stream ends at the newline. Markup that carries one
+# has to be spread over a `data:` line each, or it ends the field early and
+# Datastar empties the selector instead of replacing it.
+(let [[[size body]] (chunks (ds/msg/patch-elements
+                              "<style id=\"skin\">\na { color: red; }\n</style>"
+                              "#skin" "outer"))]
+  (assert (= size (length body)) "the chunk still declares its true length")
+  (assert (= 3 (length (string/find-all "data: elements " body)))
+          "one data line per line of markup")
+  (assert (not (string/find "\n<style" body)) "no line begins with markup")
+  (assert (not (string/find "\na { color" body)) "not the middle either")
+  (assert (not (string/find "\n</style>" body)) "nor the end")
+  (assert (string/has-suffix? "data: elements </style>\n\n" body)
+          "and the event ends where it should"))
+
+(let [[[_ body]] (chunks (ds/msg/patch-elements "<p>one line</p>" "#p" "inner"))]
+  (assert (= 1 (length (string/find-all "data: elements " body)))
+          "single-line markup is unchanged"))
+(end-suite)
+
 (start-suite :a-whole-transition)
 (def document
   (ds/transition :gone ["#totals" "#track"] :into "#stage"
