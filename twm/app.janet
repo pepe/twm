@@ -268,7 +268,11 @@ dynamics as set by *rpc-defines*.```
   (def parser
     (http/parser
       (cond-> routes
-              static (put :not-found (http/static public))
+              # The space's own `:not-found` answers whatever is not a file,
+              # so a Membrane kept in that slot survives the static handler
+              # being put there. A space without one gets gp's plain 404.
+              static (put :not-found
+                          (http/static public nil (routes :not-found)))
               true http/drive log? event-journal)))
   (make-watch
     (producer

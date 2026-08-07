@@ -601,14 +601,19 @@
         (update place :rpc (update-rpc (merge rpc/guardian rpc-funcs))))
       (each space (values (get state :spaces {}))
         (put space :routes (routes templates space))
-        # A guardian answers on the address of the place it holds, so any
-        # file the Membrane asks for is asked of whoever is standing there
-        # -- and a guardian cannot answer. Serving statics means `os/stat`,
-        # which means the `:fs` capability, and the guardian is the one
-        # component facing the world before anyone has authenticated. It
-        # stays sandboxed to `:net`, so the Membrane it serves must ask the
-        # network for nothing the guardian cannot give it.
-        (put space :static false))
+        # A guardian answers on the address of the place it holds, so the
+        # stylesheet the Membrane asks for is asked of whoever is standing
+        # there. Refusing to serve it was tenable while the sentry's pages
+        # were self-contained; sharing one Membrane, it would mean the door
+        # loses its styling exactly while the guardian holds it -- or else
+        # carries every asset inlined, which is what it was doing.
+        #
+        # Serving statics means `os/stat`, so a project that wants this must
+        # grant its guardian `:fs`, widening the sandbox of the one component
+        # facing the world before anyone has authenticated. That is the trade
+        # and it is the project's to make: the place's own public path is
+        # already inherited, and it is served when there is one.
+        (put space :static (truthy? (space :public))))
       state)
     "assemble sentry"))
 
