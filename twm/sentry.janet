@@ -232,40 +232,50 @@
   (handover/space view)
   (produce (^aether/spawn guards "") (^place/leave guards)))
 
+(def- <handover/>
+  ```
+  Header ending the connection that carried a handover.
+
+  A listener can be closed and the connections it accepted go on living --
+  `space/let-go` depends on exactly that, so the answer still reaches
+  whoever asked. The cost is that the browser holds a keep-alive socket to
+  the guardian, and the beat's request for `/content` would travel back
+  down it to a symbiont that has just stepped out of the door. It would be
+  answered, too: a session exists by then, so the guardian would offer the
+  visitor the way in all over again, while the symbiont that has taken the
+  place stands behind a door nobody knocks on.
+
+  The connection has to end with the transition. Then the beat opens a new
+  one, and a new one reaches whoever is listening now.
+  ```
+  {"Connection" "close"})
+
 (defn- logout/response
-  "Returns a Missing.css readiness page only after logout has settled on Tree."
-  [done sent]
-  (fn [conn]
+  ```
+  Streams the logout transition, and only once logout has settled on Tree.
+
+  The cookie is dropped in the head, before the first event: the session it
+  names is already dead server-side, and a browser still holding it would
+  spend the reconnection presenting a key to a lock that has been changed.
+  `Max-Age=0` has to repeat the name, path and domain it was set with, or
+  it removes nothing and leaves a second cookie beside the first.
+
+  Waiting on `done` before answering is what makes the reconnection safe.
+  The stage the browser comes back to is served by whoever holds the place,
+  and if that is still this symbiont it must already know the session ended
+  -- otherwise the door reopens on the posture that was just left.
+  ```
+  [view done sent]
+  (def transition (view :transition/logout))
+  (def {:cookie-host cookie-host} view)
+  (http/stream-with
+    (merge <handover/>
+           (http/cookie "session"
+                        (string "; Max-Age=0; Path=/; Domain=" cookie-host ";")))
     (ev/take done)
-    (protect
-      (:write conn
-              (http/html-success-resp
-                (hg/html
-                  @[hg/doctype-html
-                    [:html {:lang "en"}
-                     [:head
-                      [:title "Logged out · MTB"]
-                      [:meta {:name "viewport"
-                              :content "width=device-width, initial-scale=1"}]
-                      [:link {:rel "stylesheet"
-                              :href "https://unpkg.com/missing.css@1.1.1/dist/missing.css"}]]
-                     [:body
-                      [:header {:class "center"}
-                       [:h1 "Welcome to MTB."]]
-                      [:main {:class "center"}
-                       [:h1 "Logged out"]
-                       [:p
-                        "Your session has ended safely."]
-                       [:p
-                        "Returning you to the entrance…"]
-                       (<script/redirect/> "/")]
-                      [:footer "mtb.pan.earth"]
-                      ]
-                     ]
-                    ]))))
-    (protect (:flush conn))
-    (:give sent true)
-    (ev/give-supervisor :close conn)))
+    (:write (dyn :sse-conn) transition)
+    (protect (:flush (dyn :sse-conn)))
+    (:give sent true)))
 
 (defn- logout/standdown-after
   "Waits for the logout response before exiting the symbiont."
@@ -310,7 +320,7 @@
       (^session/end (^tenant/refresh-view :cap/session)
                     settled
                     (logout/standdown-after sent))))
-  (logout/response done sent))
+  (logout/response view done sent))
 
 (defn =>session/?eq
   "Creates a session check function from a non-empty session `key`."
@@ -352,22 +362,43 @@
           (http/not-authorized not-auth
                                (http/content-type ".html")))))))
 
-(def <handover/>
-  ```
-  Header ending the connection that asked to be let through.
-
-  A handover answers over a connection the asker will keep and reuse,
-  and the next thing it sends down it is the redirect -- to a door the
-  guardian has just closed. A closed door turns nobody away who never
-  knocks. The connection has to end with the answer.
-  ```
-  {"Connection" "close"})
-
 (def <form/>
-  "Shared sentry login form."
-  [:form {:method "POST" :class "f-col center"}
-   [:input {:type "password" :name "secret"}]
+  ```
+  Shared sentry login form, offered over Datastar rather than posted.
+
+  A form that posts navigates, and navigating renews the Membrane -- which
+  is the one thing a posture change must not do. `__prevent` is Datastar's
+  own modifier, so nothing here is a script either.
+  ```
+  [:form {:id "gate" :class "f-col center"
+          :data-signals "{secret:''}"
+          :data-on:submit__prevent "@post('/')"}
+   [:input {:type "password" :data-bind "secret"}]
    [:button [:strong "Use"]]])
+
+(defn- content/into-stage
+  "Writes `elements` into the Membrane's stage, replacing what is there."
+  [elements]
+  (ds/hg/patch elements "#stage" "inner"))
+
+(defn- handover/transition
+  ```
+  Writes a prebuilt transition and then gives the place up.
+
+  The order is the whole of it. The document has to be on the wire before
+  the listener closes, because closing wakes the accepting fiber and can
+  take the response with it; and the stream has to end after, because the
+  beat only starts counting once the browser sees the stream finish.
+
+  What the beat is counting is this handover: by the time it reopens
+  `/content`, the door is meant to be answered by whoever is rising into
+  it. Nothing here waits for that to be true -- the beat is a constant,
+  and a boot slower than it will be met by a door still changing hands.
+  ```
+  [view guards transition]
+  (:write (dyn :sse-conn) transition)
+  (protect (:flush (dyn :sse-conn)))
+  (handover/after-response view guards))
 
 (defn ^prepare-view
   "Initializes the shared sentry handler view with project templates."
@@ -388,6 +419,8 @@
          (merge (select-keys state [:name :secret :key])
                 (select-keys place [:guards :public :cookie-host :address :tenant])
                 @{:cap/session cap :templates templates :tenant/address home
+                  :transition/login (get templates :transition/login)
+                  :transition/logout (get templates :transition/logout)
                   :space place}))
        (each space (values (get state :spaces {}))
          (merge-into space (select-keys state [:log :debug]))
@@ -399,111 +432,119 @@
     "prepare sentry view"))
 
 (defh index
-  "Renders the sentry form or an optional dormant-session resume page."
+  ```
+  Serves the Membrane.
+
+  It says nothing about who is standing in the door. The Membrane is the
+  same document whether a session exists or not -- what differs is what
+  `/content` streams into it, and that is asked separately, a moment later.
+  Deciding it here would put the posture in the one document that has to
+  survive posture changes.
+  ```
   [http/cookies]
   (define :view)
-  (define :conn)
-  (def {:page page :title title :success success :resume resume} (view :templates))
-  (def {:guards guards :address address} view)
+  (def {:membrane membrane} (view :templates))
+  (http/html-success-resp (membrane)))
+
+(defh /content
+  ```
+  Streams the sentry's posture into the Membrane's stage.
+
+  Three of them: no session and the door asks for a secret; a session and a
+  dormant symbiont, and the door offers to wake it; a session and nothing
+  dormant, and the door has no business being held at all -- the transition
+  goes out and the place is handed over.
+  ```
+  [http/cookies]
+  (define :view)
+  (def {:title title :form form :resume resume} (view :templates))
+  (def transition (view :transition/login))
+  (def {:guards guards} view)
   (if-let [ck ((view :cap/session) req)]
     (if resume
-      (http/html-success-resp (page (resume guards)))
-      (do
-        (match
-          (protect
-            (:write conn
-                    (http/html-success-resp
-                      (page @[(success guards) (<script/redirect/> address)])
-                      <handover/>))
-            (:flush conn))
-          [true _] (do (handover/after-response view guards) {})
-          [false _] {})))
-    (http/html-success-resp
-      (page @[(if (function? title) (title (human guards)) title)
-              <form/>]))))
+      (http/stream (content/into-stage (resume guards)))
+      (http/stream-with <handover/> (handover/transition view guards transition)))
+    (http/stream
+      (content/into-stage
+        @[(if (function? title) (title (human guards)) title)
+          (or form <form/>)]))))
 
 (defh /continue
-  "Starts the guarded symbiont after a valid dormant sentry session."
+  "Wakes the guarded symbiont after a valid dormant sentry session."
   [http/cookies]
   (define :view)
-  (define :conn)
-  (def {:page page :success success} (view :templates))
-  (def {:guards guards :address address} view)
-  (if-let [ck ((view :cap/session) req)]
-    (do
-      (match
-        (protect
-          (:write conn
-                  (http/html-success-resp
-                    (page @[(success guards) (<script/redirect/> address)])
-                    <handover/>))
-          (:flush conn))
-        [true _] (do (handover/after-response view guards) {})
-        [false _] {}))
-    (http/see-other "/")))
+  (def transition (view :transition/login))
+  (def {:guards guards} view)
+  (if ((view :cap/session) req)
+    (http/stream-with <handover/> (handover/transition view guards transition))
+    (http/stream (content/into-stage <form/>))))
 
 (defh auth
-  "Authenticates a sentry secret and publishes its session."
-  [http/urlenc-post]
+  ```
+  Authenticates a secret offered over Datastar and publishes its session.
+
+  The cookie goes in the head of this very stream. It is the only place it
+  can go: once events are flowing the head is gone, and an HttpOnly cookie
+  is beyond the reach of anything the browser could be told to do. So the
+  session is established, the head carries it, and only then does the
+  transition go out.
+  ```
+  [http/keywordize-body http/json->body]
   (define :view)
-  (define :conn)
-  (def {:page page :success success :failure failure} (view :templates))
+  (def {:failure failure :form form} (view :templates))
+  (def transition (view :transition/login))
+  # Datastar sends a GET's signals in the query and a POST's in the body.
+  # This is a POST, because the secret has no business in a URL.
+  (def secret (get body :secret ""))
   (produce (diag "auth-request name=" (view :name)
                  " secret-present=" (truthy? (view :secret))
-                 " body-secret-present=" (present-string? (get body :secret ""))))
+                 " offered-secret-present=" (present-string? secret)))
   (if-let [sec (view :secret)
-           bsec (get body :secret "")
-           {:cookie-host cookie-host :key key
-            :guards guards :address address} view
-           _ (pwhash/verify sec bsec key)]
+           {:cookie-host cookie-host :key key :guards guards} view
+           _ (pwhash/verify sec secret key)]
     (let [sk (derive-from key)]
-      (fn [conn]
-        (produce (diag "auth-success name=" (view :name)
-                       " guards=" guards " cookie-host=" cookie-host
-                       " session-length=" (length sk)))
-        (match
-          (protect
-            (:write conn
-                    (http/html-success-resp
-                      (page @[(success guards) (<script/redirect/> address)])
-                      (merge <handover/>
-                             (http/cookie
-                               "session"
-                               (string sk "; Secure; HttpOnly; Domain="
-                                       cookie-host ";")))))
-            (:flush conn))
-          [true _] (do
-                     (produce (^session/new sk))
-                     (handover/after-response view guards))
-          [false _] nil)))
+      (produce (diag "auth-success name=" (view :name)
+                     " guards=" guards " cookie-host=" cookie-host
+                     " session-length=" (length sk)))
+      (http/stream-with
+        (merge <handover/>
+               (http/cookie "session"
+                            (string sk "; Secure; HttpOnly; Path=/; Domain="
+                                    cookie-host ";")))
+        (produce (^session/new sk))
+        (handover/transition view guards transition)))
     (do
       (produce (diag "auth-failure name=" (view :name)))
-      (http/html-success-resp (page @[failure <form/>])))))
+      # A refused secret changes no posture: the door stays held, the
+      # Membrane stays put, and the stage is simply told to say so.
+      (http/stream
+        (content/into-stage @[failure (or form <form/>)])))))
 
 (defh inhabited
   ```
-  Serves a place the guardian holds for a symbiont other than the tenant's
-  own. There is no secret to offer here: the session is granted at the
-  tenant's door, and this door only asks whether it was.
+  Serves the Membrane for a place the guardian holds for a symbiont other
+  than the tenant's own. There is no secret to offer here: the session is
+  granted at the tenant's door, and this door only asks whether it was.
   ```
   [http/cookies]
   (define :view)
-  (define :conn)
-  (def {:page page :success success :unauthorized unauthorized} (view :templates))
-  (def {:guards guards :address address :tenant/address home} view)
-  (if-let [ck ((view :cap/session) req)]
-    (do
-      (match
-        (protect
-          (:write conn
-                  (http/html-success-resp
-                    (page @[(success guards) (<script/redirect/> address)])
-                    <handover/>))
-          (:flush conn))
-        [true _] (do (handover/after-response view guards) {})
-        [false _] {}))
-    (http/not-authorized (unauthorized guards home)
-                         (http/content-type ".html"))))
+  (def {:membrane membrane} (view :templates))
+  (http/html-success-resp (membrane)))
+
+(defh inhabited/content
+  ```
+  Streams the posture of a place held for another symbiont. With a session
+  the place is handed back; without one there is nowhere here to earn it,
+  so the stage says where to go instead.
+  ```
+  [http/cookies]
+  (define :view)
+  (def {:unauthorized unauthorized} (view :templates))
+  (def transition (view :transition/login))
+  (def {:guards guards :tenant/address home} view)
+  (if ((view :cap/session) req)
+    (http/stream-with <handover/> (handover/transition view guards transition))
+    (http/stream (content/into-stage (unauthorized guards home)))))
 
 (defn routes
   ```
@@ -515,12 +556,17 @@
   ```
   [templates place]
   (if (not= (place :guards) (place :tenant))
-    @{"/" (http/dispatch {"GET" inhabited})}
+    @{"/" (http/dispatch {"GET" inhabited})
+      "/content" (http/dispatch {"GET" inhabited/content})}
     (merge
       (if (get templates :fallback false)
         @{:not-found (http/dispatch {"GET" index "POST" auth})}
         @{"/" (http/dispatch {"GET" index "POST" auth})})
-      @{"/continue" (http/dispatch {"GET" /continue})
+      # `/content` is the door's one moving part. Every posture the sentry
+      # can be in is streamed through it, and every transition ends by
+      # asking for it again -- of whoever holds the place by then.
+      @{"/content" (http/dispatch {"GET" /content})
+        "/continue" (http/dispatch {"GET" /continue})
         "/logout" (http/dispatch {"GET" /logout})})))
 
 (defn ^assemble
@@ -539,6 +585,13 @@
         (update place :rpc (update-rpc (merge rpc/guardian rpc-funcs))))
       (each space (values (get state :spaces {}))
         (put space :routes (routes templates space))
+        # A guardian answers on the address of the place it holds, so any
+        # file the Membrane asks for is asked of whoever is standing there
+        # -- and a guardian cannot answer. Serving statics means `os/stat`,
+        # which means the `:fs` capability, and the guardian is the one
+        # component facing the world before anyone has authenticated. It
+        # stays sandboxed to `:net`, so the Membrane it serves must ask the
+        # network for nothing the guardian cannot give it.
         (put space :static false))
       state)
     "assemble sentry"))
