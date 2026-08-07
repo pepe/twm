@@ -377,8 +377,24 @@
    [:button [:strong "Use"]]])
 
 (defn- content/into-stage
-  "Writes `elements` into the Membrane's stage, replacing what is there."
+  ```
+  Writes `elements` into the Membrane's stage, having first put back the
+  entrance's own furniture.
+
+  Taking `/content` is taking the whole place, and the Membrane in the
+  browser may be the other symbiont's -- coming out of a logout it always
+  is, because nobody navigated. So the guardian restores its skin and its
+  header before filling the stage, exactly as the symbiont it guards does
+  on the way in. Without it the entrance is rendered wearing the
+  dashboard's styling, which has no notion of centring a door.
+
+  Both are optional. A project that gives its guardian no furniture of its
+  own has none to put back.
+  ```
   [elements]
+  (def {:skin skin :header header} ((dyn :view) :templates))
+  (if skin (ds/hg/patch skin "#skin" "outer"))
+  (if header (ds/hg/patch header "header" "outer"))
   (ds/hg/patch elements "#stage" "inner"))
 
 (defn- handover/transition
