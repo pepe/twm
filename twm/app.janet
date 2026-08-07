@@ -625,17 +625,28 @@ dynamics as set by *rpc-defines*.```
   [msg]
   (string/format "%x\r\n%s\r\n" (length msg) msg))
 
+(defn ds/msg/patch-elements
+  ```
+  One SSE message patching `elements`, as a string rather than a write.
+
+  A message that is a value can be composed into a document ahead of time;
+  one that writes itself can only ever be performed. Transitions are built
+  from these.
+  ```
+  [elements &opt selector mode]
+  (chunk-msg
+    (string
+      "event: datastar-patch-elements\n"
+      (if selector (string "data: selector " selector "\n"))
+      (if mode (string "data: mode " mode "\n"))
+      "data: elements " elements "\n\n")))
+
 (defn ds/patch-elements
   "Writes patch-elements SSE message to conn"
   [elements &opt selector mode]
-  (def msg
-    (chunk-msg
-      (string
-        "event: datastar-patch-elements\n"
-        (if selector (string "data: selector " selector "\n"))
-        (if mode (string "data: mode " mode "\n"))
-        "data: elements " elements "\n\n")))
-  (protect (:write (dyn :sse-conn) msg)))
+  (protect
+    (:write (dyn :sse-conn)
+            (ds/msg/patch-elements elements selector mode))))
 
 (defn ds/hg/patch
   "patch-elements from hg `elements`"
@@ -651,6 +662,71 @@ dynamics as set by *rpc-defines*.```
         "event: datastar-patch-signals\n"
         "data: signals " (json/encode signals) "\n\n")))
   (protect (:write (dyn :sse-conn) msg)))
+
+(defn ds/msg/remove-elements
+  ```
+  One SSE message removing every element matching `selector`, as a string
+  rather than a write.
+
+  Removing an element is also how its listening stops: a stream opened by
+  `data-init` belongs to the element carrying it, and an element that has
+  left the document is not waiting for anything. There is no separate way
+  to say "stop listening", and wanting one is how a transition acquires
+  client-side logic.
+  ```
+  [selector]
+  (chunk-msg
+    (string
+      "event: datastar-patch-elements\n"
+      "data: mode remove\n"
+      "data: selector " selector "\n\n")))
+
+(defn ds/msg/beat
+  ```
+  One SSE message patching in the element that waits `delay` and then opens
+  `path` again.
+
+  This is the whole of a transition's waiting and reopening, and it is
+  written down rather than performed. Datastar's streams are fetches, not
+  `EventSource`s, so a stream the server closes stays closed and nothing
+  reconnects on its own -- which is what makes the reopening sayable in the
+  document instead of guessed at by whoever closes it.
+
+  `data-init` takes a `delay` modifier, so the beat is an attribute and not
+  a script; nothing here runs but Datastar.
+  ```
+  [selector path &opt wait]
+  (default wait "500ms")
+  (ds/msg/patch-elements
+    (string "<div id=\"beat\" data-init__delay." wait "=\""
+            "@get('" path "')\"></div>")
+    selector "append"))
+
+(defn ds/transition
+  ```
+  A whole Living Place transition, as one static string of SSE messages.
+
+  A posture change is the same five things every time: the elements whose
+  streams must stop, the elements that no longer belong, a beat, the close,
+  and the reopening. Only the first two differ between going in and coming
+  out, so the transition is worth saying once and keeping.
+
+  Built from its parts and held in a `def`, a transition is a constant in
+  the image before any request arrives. Nothing about it is decided while
+  someone is waiting: the document is the same string for every visitor,
+  and the only thing a handler chooses is which of the two to write.
+
+  `beat` is how long the waiting lasts. `gone` are the selectors to remove -- listeners and stale elements alike,
+  since removal is the only way either ends. `into` is where the beat is
+  appended and `path` what it reopens; closing the stream is the handler's
+  last act and needs nothing said here.
+  ```
+  [&named gone into path beat]
+  (default into "body")
+  (default path "/content")
+  (string
+    ;(map ds/msg/remove-elements (or gone []))
+    (ds/msg/beat into path beat)))
 
 (defn ds/get
   "Constructs ds get uri"
