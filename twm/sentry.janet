@@ -460,7 +460,7 @@
   [http/cookies]
   (define :view)
   (def {:membrane membrane} (view :templates))
-  (http/html-success-resp (membrane)))
+  (membrane/resp (membrane)))
 
 (defh /content
   ```
@@ -545,7 +545,7 @@
   [http/cookies]
   (define :view)
   (def {:membrane membrane} (view :templates))
-  (http/html-success-resp (membrane)))
+  (membrane/resp (membrane)))
 
 (defh inhabited/content
   ```

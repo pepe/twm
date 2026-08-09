@@ -46,6 +46,28 @@
        ,(handler-fn name body)
        ,;middlewares)))
 
+(defn membrane/resp
+  ```
+  A Membrane response: HTML that must never be answered from cache.
+
+  The Membrane is the one document a posture change does not renew, which
+  is exactly what lets it survive the change -- and it is also why nothing
+  ever displaces a copy the browser has kept. A Membrane cached while the
+  guardian held the door outlives the handover: it goes on showing the
+  stage the guardian last patched, and asks nothing of whoever holds the
+  place now, because from the browser's side no navigation is due. A
+  reload does not help, since the cached document is what is revalidated.
+
+  `/content` is already safe -- the SSE head says `no-cache` -- so it is
+  only the document wrapping it that can go stale. `no-store` keeps it as
+  short-lived as the posture it was served in.
+
+  The headers table is made fresh on every call: `html-success-resp`
+  merges the content type into whatever it is given.
+  ```
+  [body]
+  (http/html-success-resp body @{"Cache-Control" "no-store"}))
+
 # RPC
 (defdyn *rpc-defines* "Dynamics with what should defined in rpc-fn")
 
