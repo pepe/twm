@@ -203,7 +203,10 @@
   [_ state _]
   (def name (state :name))
   (if-let [space (place/of state name)] (space/let-go space))
-  [(^aether/left name) Exit])
+  # Standing down is leaving, and leaving is saying so to the peers this
+  # symbiont registered with. Without it the tree keeps a client to a
+  # process that has gone, and pushes into it long afterwards.
+  [ClosePeers (^aether/left name) Exit])
 
 (defn- logout/settled
   "Returns an event that wakes a waiting logout response."

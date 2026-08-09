@@ -186,10 +186,35 @@
     (. "register " peer)))
 
 (define-watch ClosePeers
-  "Closes all connections to peers"
+  ```
+  Says goodbye to every peer this symbiont registered with, and then closes
+  the connections to them.
+
+  Closing said nothing to anyone. A peer that registers is dialled back by
+  whoever it registered with, and that provider keeps the client it dialled
+  with -- so a symbiont that merely closed its own side left a live-looking
+  client behind on the other. The tree then went on pushing to an address
+  nobody was answering, and because `^peer/refresh` reopens a failed line
+  from inside the tree's own transaction, each ghost cost it two refused
+  connects with its manager blocked for both. Raise and stop the same
+  symbiont a few times and the tree stops answering anything at all.
+
+  The goodbye has to come first, which is why it lives here rather than
+  beside the callers: it is said over the very connection the next line
+  closes, and every path that gives up peers goes through this one. A peer
+  offering no `:deregister` is skipped, and one already closed carries no
+  stream to say it over -- so arriving here twice is harmless.
+  ```
   [_ state _]
-  (def {:peers peers} state)
-  (each peer peers (protect (:close (state peer)))))
+  (def {:peers peers :name name} state)
+  (def tenant ((>or (=<> :guards) (=<> :name)) state))
+  (each peer peers
+    (def client (state peer))
+    (when (table? client)
+      (when-let [_ (client :stream)
+                 dereg (client :deregister)]
+        (protect (dereg client name tenant)))
+      (protect (:close client)))))
 
 (defn close-peers-stop
   "RPC function that closes peers and stops the server"
