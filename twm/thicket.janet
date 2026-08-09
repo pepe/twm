@@ -1,7 +1,18 @@
 (import ./app :prefix "" :export true)
 
 (defn- peer/reset-client
-  "Replaces a client after a failed open so retries start cleanly."
+  ```
+  Replaces a client after a failed open so retries start cleanly.
+
+  Reached from the retry loops through `_`, which is `match`'s wildcard.
+  It was `true`, which `match` compares literally against the tuple it is
+  given and therefore never matches: the loop ended on the first failed
+  open, before the client had been reset and before the tries ran out. So
+  it neither connected nor said it could not, and the peer kept the
+  unopened `Client` it had been given in `:update` -- a table with the
+  prototype's methods and none of the remote ones, which is why the first
+  call on it failed with "unknown method" long afterwards.
+  ```
   [state peer]
   (when-let [old (state peer)]
     (when (table? old)
@@ -42,7 +53,7 @@
              [[true _] _] (produce (log name " connected to " peer))
              [[false err] 10]
              (produce (log name " cannot connect to " peer ": " err))
-             true (peer/reset-client state peer))
+             _ (peer/reset-client state peer))
            (ev/sleep (* (++ tries) 0.1)))
          (if (present? succ) (produce ;succ))))}
     (. "connect peer " peer)))
@@ -72,7 +83,7 @@
              [[true _] _] (produce (log name " connected to " peer))
              [[false err] 10]
              (produce (log name " cannot connect to " peer ": " err))
-             true (peer/reset-client state peer))
+             _ (peer/reset-client state peer))
            (ev/sleep (* (++ tries) 0.1)))
          (if succ (produce ;succ))))}
     (. "connect peer " peer)))
@@ -115,7 +126,7 @@
                                           " peer=" peer " tries=" tries
                                           " err=" err)
                                     (log name " cannot connect to " peer ": " err)))
-               true (peer/reset-client state peer))
+               _ (peer/reset-client state peer))
              (ev/sleep (* (++ tries) 0.1))))
          (if failed (produce fail) (produce succ))))}
     "connect peers"))
