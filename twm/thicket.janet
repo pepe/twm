@@ -128,7 +128,14 @@
                                     (log name " cannot connect to " peer ": " err)))
                _ (peer/reset-client state peer))
              (ev/sleep (* (++ tries) 0.1))))
-         (if failed (produce fail) (produce succ))))}
+         # Several events may hang on the connecting, and what they have in
+         # common is that none of them may happen before it: a door opened
+         # ahead of the tree is a door that cannot answer what it accepts.
+         # Spliced as `^rpc/start` splices its own, so a single event still
+         # reads as one.
+         (if failed
+           (produce ;(if (indexed? fail) fail [fail]))
+           (produce ;(if (indexed? succ) succ [succ])))))}
     "connect peers"))
 
 (defn ^session/cap

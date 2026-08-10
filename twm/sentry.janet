@@ -630,6 +630,17 @@
   able to reach. The supplied `start` event owns the final readiness event,
   so registration and the Aether announcement happen only after its RPC
   listeners are bound.
+
+  The doors open after the peers are connected, never before. A guardian
+  that binds first is answering the world while it still has no tree: the
+  first visitor's secret is accepted and then published through a client
+  that has been made and never opened, which fails as an unknown method
+  far from here. It is a narrow window on a listening tree and a wide one
+  wherever a refused connection is slow to be refused, and it is
+  reachable by nothing more unusual than typing quickly. Every other
+  symbiont already raises its HTTP inside its start event, which is on
+  this side of the connecting -- the guardian was the one raising it
+  outside.
   ```
   [config templates rpc-funcs start & before]
   (-> config
@@ -637,8 +648,7 @@
       (:transact ;before
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
-                 HTTP
-                 (^connect-peers start Exit))
+                 (^connect-peers [HTTP start] Exit))
       :await))
 
 (defmacro main
