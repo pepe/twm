@@ -584,15 +584,27 @@
   given a navigation's answer. Read off the raw query string rather than
   the parsed parameters, which depend on a middleware being in the chain.
 
-  Refusing is the whole of it: the stale tab stops being lied to and needs
-  a reload. Answering it with a stream that patches the entrance back in
-  would let such a tab heal itself, and would put posture into a fallback,
-  which is a larger thing than this.
+  Refusing was the first answer and it was not enough: the tab stopped
+  being lied to and went on showing a departed symbiont's document, since
+  nothing in it had any reason to ask for anything else. So the stray
+  stream is answered as a stream, and what it carries is a way out --
+  the same knock the guardian uses when it hands a place over, patched in
+  and left to enter the door on its own.
+
+  A redirect status would not do it. Datastar asks with `fetch`, which
+  follows a redirect itself and hands the body back to the caller; the
+  browser never goes anywhere. Navigating is the document's to do, so it
+  has to be told in something the document will run.
+
+  This is posture in a fallback, which is more than a fallback is meant
+  to carry. It earns it by being the only line left to a tab whose place
+  has gone.
   ```
-  [handler]
+  [address handler]
   (fn navigations-only [req]
     (if (string/find "datastar=" (or (req :query-string) ""))
-      (http/not-found)
+      (http/stream
+        (ds/hg/patch (<script/redirect/> address) "body" "append"))
       (handler req))))
 
 (defn routes
@@ -610,6 +622,7 @@
     (merge
       (if (get templates :fallback false)
         @{:not-found (navigations-only
+                       (place :address)
                        (http/dispatch {"GET" index "POST" auth}))}
         @{"/" (http/dispatch {"GET" index "POST" auth})})
       # `/content` is the door's one moving part. Every posture the sentry
