@@ -565,6 +565,36 @@
     (http/stream-with <handover/> (handover/transition view guards transition))
     (http/stream (content/into-stage (unauthorized guards home)))))
 
+(defn- navigations-only
+  ```
+  Wraps a fallback so it answers navigations and refuses stream requests.
+
+  A fallback that serves the Membrane for every unrouted path is right for
+  a visitor arriving at an address nobody routed -- that is what it is
+  for. It is wrong for the endpoints belonging to the symbiont this
+  guardian stands in for. When that symbiont goes, the browser holding its
+  document does not: it goes on asking for the streams that document
+  opened, `/totals` and the rest, and the guardian has no such routes. So
+  every one of them fell to the fallback and was answered with an HTML
+  document under a 200. Datastar asked for events and was handed a page,
+  over and over, and the tab quietly came apart.
+
+  Datastar says who it is. Its signals ride in a `datastar` query
+  parameter, so a request carrying one is not a navigation and must not be
+  given a navigation's answer. Read off the raw query string rather than
+  the parsed parameters, which depend on a middleware being in the chain.
+
+  Refusing is the whole of it: the stale tab stops being lied to and needs
+  a reload. Answering it with a stream that patches the entrance back in
+  would let such a tab heal itself, and would put posture into a fallback,
+  which is a larger thing than this.
+  ```
+  [handler]
+  (fn navigations-only [req]
+    (if (string/find "datastar=" (or (req :query-string) ""))
+      (http/not-found)
+      (handler req))))
+
 (defn routes
   ```
   Builds the routes of one living space.
@@ -579,7 +609,8 @@
       "/content" (http/dispatch {"GET" inhabited/content})}
     (merge
       (if (get templates :fallback false)
-        @{:not-found (http/dispatch {"GET" index "POST" auth})}
+        @{:not-found (navigations-only
+                       (http/dispatch {"GET" index "POST" auth}))}
         @{"/" (http/dispatch {"GET" index "POST" auth})})
       # `/content` is the door's one moving part. Every posture the sentry
       # can be in is streamed through it, and every transition ends by
