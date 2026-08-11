@@ -260,8 +260,10 @@
   The cookie is dropped in the head, before the first event: the session it
   names is already dead server-side, and a browser still holding it would
   spend the reconnection presenting a key to a lock that has been changed.
-  `Max-Age=0` has to repeat the name, path and domain it was set with, or
-  it removes nothing and leaves a second cookie beside the first.
+  `Max-Age=0` removes a cookie only by matching the name, path and domain
+  it was set with, so this has to say exactly what `auth` said and no more
+  -- an expiry aimed at a scope nothing was ever set at removes nothing and
+  leaves the live cookie sitting beside a second, empty one.
 
   Waiting on `done` before answering is what makes the reconnection safe.
   The stage the browser comes back to is served by whoever holds the place,
@@ -270,11 +272,9 @@
   ```
   [view done sent]
   (def transition (view :transition/logout))
-  (def {:cookie-host cookie-host} view)
   (http/stream-with
     (merge <handover/>
-           (http/cookie "session"
-                        (string "; Max-Age=0; Path=/; Domain=" cookie-host ";")))
+           (http/cookie "session" "; Max-Age=0; Path=/;"))
     (ev/take done)
     (:write (dyn :sse-conn) transition)
     (protect (:flush (dyn :sse-conn)))
@@ -507,6 +507,14 @@
   is beyond the reach of anything the browser could be told to do. So the
   session is established, the head carries it, and only then does the
   transition go out.
+
+  It carries no `Domain`, which makes it host-only: the browser offers it
+  back to the host that issued it and to no other. A `Domain` widens a
+  cookie to that host *and every name beneath it*, so a session issued at
+  the apex is presented at every environment standing under it -- and two
+  cookies of one name arrive together, of which a server sees whichever it
+  happens to keep. Places sharing a host and told apart by path need none
+  of that width; they are already the same host.
   ```
   [http/keywordize-body http/json->body]
   (define :view)
@@ -519,17 +527,15 @@
                  " secret-present=" (truthy? (view :secret))
                  " offered-secret-present=" (present-string? secret)))
   (if-let [sec (view :secret)
-           {:cookie-host cookie-host :key key :guards guards} view
+           {:key key :guards guards} view
            _ (pwhash/verify sec secret key)]
     (let [sk (derive-from key)]
       (produce (diag "auth-success name=" (view :name)
-                     " guards=" guards " cookie-host=" cookie-host
-                     " session-length=" (length sk)))
+                     " guards=" guards " session-length=" (length sk)))
       (http/stream-with
         (merge <handover/>
                (http/cookie "session"
-                            (string sk "; Secure; HttpOnly; Path=/; Domain="
-                                    cookie-host ";")))
+                            (string sk "; Secure; HttpOnly; Path=/;")))
         (produce (^session/new sk))
         (handover/transition view guards transition)))
     (do
