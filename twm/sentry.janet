@@ -424,9 +424,16 @@
   reads the one it is answering for now instead of being compiled with a
   single one. The trailing slash is trimmed because `path` brings its own,
   and an address written with one would otherwise ask for `//content`.
+
+  `address` is given explicitly by whatever is built before there is a
+  view to read -- a transition is written once per place and kept, not
+  rendered per request -- and defaults to the view of the place being
+  answered for. An address of nothing yields the bare path, which is what
+  this always did.
   ```
-  [path]
-  (def address (or ((dyn *view*) :address) ""))
+  [path &opt address]
+  (default address (get (dyn *view*) :address))
+  (default address "")
   (string (if (string/has-suffix? "/" address)
             (slice address 0 -2)
             address)
@@ -490,6 +497,22 @@
   (protect (:flush (dyn :sse-conn)))
   (handover/after-response view guards))
 
+(defn- transition/of
+  ```
+  The transition a project keeps under `key`, settled for `place`.
+
+  A transition is written down rather than performed -- one static string
+  of SSE messages, built once and sent verbatim -- so unlike a template it
+  is never rendered with a view to hand. The place it reopens has to be
+  decided while the place is still in scope, which is here.
+
+  A project that supplies a string is left with it, and keeps the
+  root-absolute path it always had.
+  ```
+  [templates key place]
+  (def held (get templates key))
+  (if (function? held) (held (or (place :address) "")) held))
+
 (defn ^prepare-view
   "Initializes the shared sentry handler view with project templates."
   [templates]
@@ -509,8 +532,13 @@
          (merge (select-keys state [:name :secret :key])
                 (select-keys place [:guards :public :cookie-host :address :tenant])
                 @{:cap/session cap :templates templates :tenant/address home
-                  :transition/login (get templates :transition/login)
-                  :transition/logout (get templates :transition/logout)
+                  # A transition is a constant -- built once and written
+                  # verbatim -- so the place it reopens has to be settled
+                  # here, where the place is known, rather than per
+                  # request. A project that supplies a string instead of a
+                  # function keeps the root-absolute path it always had.
+                  :transition/login (transition/of templates :transition/login place)
+                  :transition/logout (transition/of templates :transition/logout place)
                   :space place}))
        (each space (values (get state :spaces {}))
          (merge-into space (select-keys state [:log :debug]))
