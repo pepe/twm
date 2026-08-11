@@ -325,13 +325,48 @@
                     (logout/standdown-after sent))))
   (logout/response view done sent))
 
+(defn- session/?offered
+  ```
+  Whether `key` is what a request offered under `session`, or among the
+  values it offered there.
+
+  Written with a scan rather than a type test because this closure is
+  marshalled: the capability is built here, handed to the tree, and sent
+  back down the mycelium to whoever holds the place. `gp`'s RPC marshals
+  with no dictionary, so a C function reached from inside it cannot cross
+  -- `indexed?`, `array?` and `type` each take the tree's connection down
+  with them at the moment it answers `:register`. The comparison operator
+  survives because the compiler inlines it as an instruction rather than
+  looking it up.
+
+  A single value never reaches the loop, and a string that reaches it is
+  walked as bytes, which are integers and match no session.
+  ```
+  [key]
+  (fn offered? [offered]
+    (var found (= key offered))
+    (unless found
+      (when offered
+        (each value offered
+          (when (= key value) (set found true)))))
+    found))
+
 (defn =>session/?eq
-  "Creates a session check function from a non-empty session `key`."
+  ```
+  Creates a session check function from a non-empty session `key`.
+
+  What arrives under `session` may be one value or several. Two cookies of
+  one name are distinct whenever their domain or path differ, and a
+  browser offers every one that matches, together, in the order it likes.
+  So the question this asks is whether any of them is this session -- not
+  whether the one that happened to arrive last is, which is a question
+  about another host's login times.
+  ```
   [key]
   # The empty string is the logout sentinel. Janet considers it truthy,
   # so checking only `key` would let an empty Cookie match an ended session.
   (if (present-string? key)
-    (=<> :headers "Cookie" "session" (?eq key))
+    (=<> :headers "Cookie" "session" (session/?offered key))
     (>base false)))
 
 (defn check-session
