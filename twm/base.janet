@@ -58,13 +58,22 @@
   (log (string/format format ;msg)))
 
 (defn event-journal
-  "Middleware that produces log of the request."
-  [next-middleware]
+  ```
+  Middleware that produces log of the request, naming the living space it
+  was asked of.
+
+  A peer's stderr is the Demiurge's own, so one file carries the whole
+  thicket; and one symbiont holds as many living spaces as it stands in
+  doors, answering all of them from a single process. Unnamed, a line
+  says that a request was answered and not by whom -- which is the only
+  thing worth knowing when two places disagree about who holds one.
+  ```
+  [next-middleware name]
   (http/journal
     next-middleware
     |(produce
-       (logf "%s %s %s in %s, %s"
-             ($ :head) ($ :method) ($ :fulluri)
+       (logf "%s %s %s %s in %s, %s"
+             name ($ :head) ($ :method) ($ :fulluri)
              ($ :elapsed) ($ :reqs)))))
 
 (defn stacktrace

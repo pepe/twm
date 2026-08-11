@@ -295,7 +295,7 @@ dynamics as set by *rpc-defines*.```
               # being put there. A space without one gets gp's plain 404.
               static (put :not-found
                           (http/static public nil (routes :not-found)))
-              true http/drive log? event-journal)))
+              true http/drive log? (event-journal name))))
   (make-watch
     (producer
       (space/dwell view)
