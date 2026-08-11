@@ -400,17 +400,53 @@
           (http/not-authorized not-auth
                                (http/content-type ".html")))))))
 
-(def <form/>
+(defn place/url
+  ```
+  `path` as the browser must ask for it of the place being answered for.
+
+  A place is either an origin of its own -- its own host, or its own port
+  -- or one of several sharing an origin and told apart by a path. Every
+  URL in a document is resolved by the browser against the origin, so a
+  root-absolute `/content` asks the origin's *root* for it. Where a place
+  is its own origin that is the place itself, which is why this was never
+  wrong in development, where each door has a port. Where places share an
+  origin the root is the tenant's, so a guarded door served its Membrane
+  and the Membrane then opened the tenant's stage -- the cosymbiont
+  reached, and answered for by somebody else.
+
+  The tenant's own door is the only one carrying a form, a resume or a
+  logout, and its address is the origin's root wherever this arrangement
+  is used, so those were never wrong. They ask through here so that they
+  stay right if a tenant is ever put under a path of its own.
+
+  The `:address` already says which arrangement it is, and every symbiont
+  already writes its URLs from its own. A guardian holds several, so it
+  reads the one it is answering for now instead of being compiled with a
+  single one. The trailing slash is trimmed because `path` brings its own,
+  and an address written with one would otherwise ask for `//content`.
+  ```
+  [path]
+  (def address (or ((dyn *view*) :address) ""))
+  (string (if (string/has-suffix? "/" address)
+            (slice address 0 -2)
+            address)
+          path))
+
+(defn <form/>
   ```
   Shared sentry login form, offered over Datastar rather than posted.
 
   A form that posts navigates, and navigating renews the Membrane -- which
   is the one thing a posture change must not do. `__prevent` is Datastar's
   own modifier, so nothing here is a script either.
+
+  Built per request rather than held as a constant, because where it posts
+  depends on which door is asking.
   ```
+  []
   [:form {:id "gate" :class "f-col center"
           :data-signals "{secret:''}"
-          :data-on:submit__prevent "@post('/')"}
+          :data-on:submit__prevent (string "@post('" (place/url "/") "')")}
    [:input {:type "password" :data-bind "secret"}]
    [:button [:strong "Use"]]])
 
@@ -521,7 +557,7 @@
     (http/stream
       (content/into-stage
         @[(if (function? title) (title (human guards)) title)
-          (or form <form/>)]))))
+          (or form (<form/>))]))))
 
 (defh /continue
   "Wakes the guarded symbiont after a valid dormant sentry session."
@@ -531,7 +567,7 @@
   (def {:guards guards} view)
   (if ((view :cap/session) req)
     (http/stream-with <handover/> (handover/transition view guards transition))
-    (http/stream (content/into-stage <form/>))))
+    (http/stream (content/into-stage (<form/>)))))
 
 (defh auth
   ```
@@ -578,7 +614,7 @@
       # A refused secret changes no posture: the door stays held, the
       # Membrane stays put, and the stage is simply told to say so.
       (http/stream
-        (content/into-stage @[failure (or form <form/>)])))))
+        (content/into-stage @[failure (or form (<form/>))])))))
 
 (defh inhabited
   ```
