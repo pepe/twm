@@ -121,7 +121,6 @@
 (def?! config/membrane/http-node
   dictionary?
   {:http url?
-   :cookie-host present-string?
    :address (?optional present-string?)
    :neighbors (?optional (>?? all peer?))
    :static (?optional boolean?)
