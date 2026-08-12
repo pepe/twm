@@ -846,10 +846,6 @@ dynamics as set by *rpc-defines*.```
   [x]
   ((>put :timestamp (os/time)) x))
 
-(def =>header-cookie
-  "Navigate to cookie in request headers"
-  (=> :headers "Cookie" "session"))
-
 (defn derive-from
   "Derives new key from master `key`"
   [key]

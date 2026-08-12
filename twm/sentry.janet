@@ -481,9 +481,12 @@
   (def {:header header} ((dyn :view) :templates))
   (if header (ds/hg/patch header "header" "outer"))
   (ds/hg/patch
-    # A single element arrives as an hg tuple and several as an array, and
-    # only the array is to be spread.
-    [:div {:id "entrance"} ;(if (array? elements) elements [elements])]
+    # One element or several. An element names its tag first, so a
+    # keyword there is the one and anything else is a sequence of them --
+    # true of a tuple of elements as much as an array, which asking after
+    # the container was not.
+    [:div {:id "entrance"}
+     ;(if (keyword? (first elements)) [elements] elements)]
     "#stage" "inner"))
 
 (defn- handover/transition
@@ -555,7 +558,7 @@
                (values (get state :spaces {}))))
        (defn view/of [place]
          (merge (select-keys state [:name :secret :key])
-                (select-keys place [:guards :public :cookie-host :address :tenant])
+                (select-keys place [:guards :public :address :tenant])
                 @{:cap/session cap :templates templates :tenant/address home
                   # A transition is a constant -- built once and written
                   # verbatim -- so the place it reopens has to be settled
