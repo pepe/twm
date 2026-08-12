@@ -459,24 +459,32 @@
 
 (defn- content/into-stage
   ```
-  Writes `elements` into the Membrane's stage, having first put back the
-  entrance's own furniture.
+  Writes `elements` into the Membrane's stage as the entrance, having
+  first put back the entrance's own header.
 
   Taking `/content` is taking the whole place, and the Membrane in the
   browser may be the other symbiont's -- coming out of a logout it always
-  is, because nobody navigated. So the guardian restores its skin and its
-  header before filling the stage, exactly as the symbiont it guards does
-  on the way in. Without it the entrance is rendered wearing the
-  dashboard's styling, which has no notion of centring a door.
+  is, because nobody navigated. So the guardian restores its header before
+  filling the stage, exactly as the symbiont it guards does on the way in.
 
-  Both are optional. A project that gives its guardian no furniture of its
+  What it writes is wrapped, and the wrapper is the point: it says a
+  guardian is standing here, for as long as one is. A door looks nothing
+  like the place behind it -- one element centred in an empty stage -- and
+  that used to be a stylesheet of its own, named by an element the two
+  symbionts exchanged as the place changed hands. A style that follows the
+  entrance itself needs no exchanging, and goes when the entrance does.
+
+  The header is optional. A project that gives its guardian none of its
   own has none to put back.
   ```
   [elements]
-  (def {:skin skin :header header} ((dyn :view) :templates))
-  (if skin (ds/hg/patch skin "#skin" "outer"))
+  (def {:header header} ((dyn :view) :templates))
   (if header (ds/hg/patch header "header" "outer"))
-  (ds/hg/patch elements "#stage" "inner"))
+  (ds/hg/patch
+    # A single element arrives as an hg tuple and several as an array, and
+    # only the array is to be spread.
+    [:div {:id "entrance"} ;(if (array? elements) elements [elements])]
+    "#stage" "inner"))
 
 (defn- handover/transition
   ```
@@ -496,6 +504,23 @@
   (:write (dyn :sse-conn) transition)
   (protect (:flush (dyn :sse-conn)))
   (handover/after-response view guards))
+
+(defn place/held-for-another?
+  ```
+  Whether `place` is a door this guardian holds for a symbiont other than
+  the tenant.
+
+  The one distinction that matters about a place. The tenant's door is
+  where a session is granted, so it alone carries a form, a resume and a
+  logout; and it is the door a browser is already standing at when the
+  posture changes, so its document has to survive the change. Every other
+  door is arrived at fresh and asks only whether the grant happened, so
+  its document has nothing to survive and is renewed instead.
+
+  Said once because the routes and the transition have to agree about it.
+  ```
+  [place]
+  (not= (place :guards) (place :tenant)))
 
 (defn- transition/of
   ```
@@ -537,7 +562,16 @@
                   # here, where the place is known, rather than per
                   # request. A project that supplies a string instead of a
                   # function keeps the root-absolute path it always had.
-                  :transition/login (transition/of templates :transition/login place)
+                  # Which way in this door hands over is a fact about the
+                  # door, not about the handler doing it, and it is the
+                  # same fact that decides the routes. Settled here, every
+                  # handler goes on writing whatever it finds.
+                  :transition/entering
+                  (transition/of templates
+                                 (if (place/held-for-another? place)
+                                   :transition/new-membrane
+                                   :transition/same-membrane)
+                                 place)
                   :transition/logout (transition/of templates :transition/logout place)
                   :space place}))
        (each space (values (get state :spaces {}))
@@ -576,7 +610,7 @@
   [http/cookies]
   (define :view)
   (def {:title title :form form :resume resume} (view :templates))
-  (def transition (view :transition/login))
+  (def transition (view :transition/entering))
   (def {:guards guards} view)
   (if-let [ck ((view :cap/session) req)]
     (if resume
@@ -591,7 +625,7 @@
   "Wakes the guarded symbiont after a valid dormant sentry session."
   [http/cookies]
   (define :view)
-  (def transition (view :transition/login))
+  (def transition (view :transition/entering))
   (def {:guards guards} view)
   (if ((view :cap/session) req)
     (http/stream-with <handover/> (handover/transition view guards transition))
@@ -618,7 +652,7 @@
   [http/keywordize-body http/json->body]
   (define :view)
   (def {:failure failure :form form} (view :templates))
-  (def transition (view :transition/login))
+  (def transition (view :transition/entering))
   # Datastar sends a GET's signals in the query and a POST's in the body.
   # This is a POST, because the secret has no business in a URL.
   (def secret (get body :secret ""))
@@ -664,7 +698,7 @@
   [http/cookies]
   (define :view)
   (def {:unauthorized unauthorized} (view :templates))
-  (def transition (view :transition/login))
+  (def transition (view :transition/entering))
   (def {:guards guards :tenant/address home} view)
   (if ((view :cap/session) req)
     (http/stream-with <handover/> (handover/transition view guards transition))
@@ -721,7 +755,7 @@
   guardian holds asks only whether that grant happened.
   ```
   [templates place]
-  (if (not= (place :guards) (place :tenant))
+  (if (place/held-for-another? place)
     @{"/" (http/dispatch {"GET" inhabited})
       "/content" (http/dispatch {"GET" inhabited/content})}
     (merge
