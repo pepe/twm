@@ -771,13 +771,20 @@ dynamics as set by *rpc-defines*.```
   declared it, so a posture change that takes away a form and says nothing
   about what the form collected leaves it in the document -- and in the
   query string of every request the document makes afterwards.
+
+  `saying` is written where the beat waits, after what is going has gone.
+  A handover takes about a second, and for that second the place had
+  nothing in it: the gate was already removed and whoever is rising had
+  not yet been asked for anything. An empty stage is indistinguishable
+  from a broken one.
   ```
-  [&named gone into path beat signals]
+  [&named gone into path beat signals saying]
   (default into "body")
   (default path "/content")
   (string
     (if signals (ds/msg/patch-signals signals) "")
     ;(map ds/msg/remove-elements (or gone []))
+    (if saying (ds/msg/patch-elements (hg/html saying) into "inner") "")
     (ds/msg/beat into path beat)))
 
 (defn ds/get

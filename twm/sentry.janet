@@ -539,7 +539,9 @@
   ```
   [templates key place]
   (def held (get templates key))
-  (if (function? held) (held (or (place :address) "")) held))
+  (if (function? held)
+    (held (or (place :address) "") (place :guards))
+    held))
 
 (defn ^prepare-view
   "Initializes the shared sentry handler view with project templates."
