@@ -689,15 +689,24 @@ dynamics as set by *rpc-defines*.```
   [elements &opt selector mode]
   (ds/patch-elements (hg/html elements) selector mode))
 
+(defn ds/msg/patch-signals
+  ```
+  One SSE message patching `signals`, as a string rather than a write.
+
+  A message that is a value can be composed into a document ahead of time;
+  one that writes itself can only ever be performed. Transitions are built
+  from these.
+  ```
+  [signals]
+  (chunk-msg
+    (string
+      "event: datastar-patch-signals\n"
+      "data: signals " (json/encode signals) "\n\n")))
+
 (defn ds/patch-signals
   "Writes patch-elements SSE message to conn"
   [signals]
-  (def msg
-    (chunk-msg
-      (string
-        "event: datastar-patch-signals\n"
-        "data: signals " (json/encode signals) "\n\n")))
-  (protect (:write (dyn :sse-conn) msg)))
+  (protect (:write (dyn :sse-conn) (ds/msg/patch-signals signals))))
 
 (defn ds/msg/remove-elements
   ```
@@ -756,11 +765,18 @@ dynamics as set by *rpc-defines*.```
   since removal is the only way either ends. `into` is where the beat is
   appended and `path` what it reopens; closing the stream is the handler's
   last act and needs nothing said here.
+
+  `signals` are set first, before anything is taken away, and they are the
+  other half of removing an element: a signal outlives the element that
+  declared it, so a posture change that takes away a form and says nothing
+  about what the form collected leaves it in the document -- and in the
+  query string of every request the document makes afterwards.
   ```
-  [&named gone into path beat]
+  [&named gone into path beat signals]
   (default into "body")
   (default path "/content")
   (string
+    (if signals (ds/msg/patch-signals signals) "")
     ;(map ds/msg/remove-elements (or gone []))
     (ds/msg/beat into path beat)))
 
