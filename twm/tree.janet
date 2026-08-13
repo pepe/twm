@@ -59,12 +59,50 @@
   [session]
   (sentry/=>session/?eq session))
 
+(def Settling
+  ```
+  Writes the store on the beat, and only when there is something to write.
+
+  Durability used to be every event's own business: each one that changed
+  anything wrote the whole image and collected, so one command that stops
+  a track, marks a todo done and focuses the next did it three times in as
+  many hundredths of a second. Events say `Changed` now, and this listens.
+
+  A burst becomes one write. A quiet tree writes nothing and collects
+  nothing, exactly as before. What it costs is a tick of durability
+  against an unclean death; a clean one writes on the way out.
+  ```
+  (heart-beat [Flush] (fn [_ state] (state :dirty))))
+
+(defn stop
+  ```
+  RPC function that writes the store, closes peers and stops the server.
+
+  The write is the whole reason this is not `close-peers-stop`. While
+  every event flushed for itself nothing was ever pending, so stopping had
+  nothing to say about the store; with writing gathered onto a beat there
+  is always up to a tick of it unwritten, and going without it is leaving
+  it behind. Effects run before the exit's producer is given its turn, so
+  the image is down before anyone is asked to leave.
+  ```
+  [&]
+  (produce Flush
+           ClosePeers
+           (log "RPC server going down")
+           Stop)
+  :ok)
+
 (defn run
-  "Runs Tree setup, then announces readiness after its RPC listener binds."
+  ```
+  Runs Tree setup, then announces readiness after its RPC listener binds.
+
+  `Settling` goes in after the project's setup, because it watches a store
+  the setup is what creates.
+  ```
   [config & setup]
   (-> config
       (make-manager on-error)
-      (:transact ;setup (^rpc/start AetherReady))
+      (:transact ;setup Settling (^rpc/start AetherReady))
       :await))
 
 (defmacro main

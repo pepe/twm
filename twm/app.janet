@@ -108,8 +108,28 @@ dynamics as set by *rpc-defines*.```
   [_ state]
   (put state :dirty false))
 
+(define-update Changed
+  ```
+  Marks the store as having something to write.
+
+  What an event knows is that it changed something, not that a disk should
+  be written now, and saying the second cost a write and a collection per
+  event: one command that stops a track, marks a todo done and focuses the
+  next wrote the whole image three times over. Saying the first lets
+  whoever is responsible for durability decide when, and a burst becomes
+  one write.
+  ```
+  [_ state]
+  (put state :dirty true))
+
 (define-event Flush
-  "Flushes the store"
+  ```
+  Writes the store and collects.
+
+  The two belong together: a store keeps its garbage collector switched
+  off between flushes, so this is the one moment memory is reclaimed as
+  well as recorded.
+  ```
   {:watch (fn [&] [(log "Flushing store") Clean])
    :effect (fn [_ {:store store} _]
              (:flush store)
