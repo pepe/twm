@@ -192,6 +192,16 @@
       (:register (state peer) (state :name)))
     (. "register " peer)))
 
+(def dereg/patience
+  ```
+  Seconds a goodbye may take before the closing goes ahead without it.
+
+  Short on purpose. The peer being said goodbye to is on the same box over
+  a loopback socket, so a goodbye that has not returned in seconds is not
+  slow, it is parked.
+  ```
+  2)
+
 (define-watch ClosePeers
   ```
   Says goodbye to every peer this symbiont registered with, and then closes
@@ -211,17 +221,37 @@
   closes, and every path that gives up peers goes through this one. A peer
   offering no `:deregister` is skipped, and one already closed carries no
   stream to say it over -- so arriving here twice is harmless.
+
+  The goodbye is bounded because it is a synchronous RPC run inline in this
+  watch body, which puts it inside the manager's transaction, and `protect`
+  catches errors but not parking. An unbounded one took production down for
+  37 hours on 2026-08-14: a Leave entered here and never came back, so
+  `^aether/left` was never written, `Exit` was never reached, the door was
+  never handed back, and every visitor got a bare 401 until the box was
+  restarted. A deadline turns the park into an error `protect` already
+  knows what to do with, and keeps the ordering the caller depends on. A
+  peer that misses its goodbye is left holding a ghost client, which is the
+  survivable fault described above; the thicket stopping is not.
   ```
   [_ state _]
   (def {:peers peers :name name} state)
   (def tenant ((>or (=<> :guards) (=<> :name)) state))
+  (def unsaid @[])
   (each peer peers
     (def client (state peer))
     (when (table? client)
       (when-let [_ (client :stream)
                  dereg (client :deregister)]
-        (protect (dereg client name tenant)))
-      (protect (:close client)))))
+        (unless (first (protect (ev/with-deadline dereg/patience
+                                  (dereg client name tenant))))
+          (array/push unsaid peer)))
+      (protect (:close client))))
+  # Said after the closing rather than beside each failure: the whole point
+  # is that this body must reach its end, and a log event is produced, not
+  # written, so it cannot itself be what stops.
+  (tuple ;(seq [peer :in unsaid]
+            (log name "'s goodbye to " peer " did not return in "
+                 dereg/patience "s; closed anyway"))))
 
 (defn close-peers-stop
   "RPC function that closes peers and stops the server"
