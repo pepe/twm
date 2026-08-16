@@ -68,11 +68,20 @@
   a track, marks a todo done and focuses the next did it three times in as
   many hundredths of a second. Events say `Changed` now, and this listens.
 
-  A burst becomes one write. A quiet tree writes nothing and collects
-  nothing, exactly as before. What it costs is a tick of durability
-  against an unclean death; a clean one writes on the way out.
+  A burst becomes one write. What it costs is a tick of durability against
+  an unclean death; a clean one writes on the way out.
+
+  A quiet tree still writes nothing, but it may not also collect nothing:
+  the beat that watches for dirt allocates on every tick, and with the
+  store's collector switched off between flushes a tree nobody touches
+  climbs until Janet's own interval trips, ~2GiB away. So the reclaiming
+  gets a slower beat of its own, and stands down on the ticks where `Flush`
+  is going to do it anyway.
   ```
-  (heart-beat [Flush] (fn [_ state] (state :dirty))))
+  (heart-beat
+    [Flush] (fn [_ state] (state :dirty))
+    [Collect] (fn [heart state] (and (not (state :dirty))
+                                     (zero? (mod heart 60))))))
 
 (defn stop
   ```

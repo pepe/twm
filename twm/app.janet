@@ -126,14 +126,29 @@ dynamics as set by *rpc-defines*.```
   ```
   Writes the store and collects.
 
-  The two belong together: a store keeps its garbage collector switched
-  off between flushes, so this is the one moment memory is reclaimed as
-  well as recorded.
+  A store keeps its garbage collector switched off between flushes, so
+  writing is a natural moment to reclaim as well as record -- but it is not
+  the only one it may be, and `Collect` says why.
   ```
   {:watch (fn [&] [(log "Flushing store") Clean])
    :effect (fn [_ {:store store} _]
              (:flush store)
              (gccollect))})
+
+(define-event Collect
+  ```
+  Reclaims memory without writing the store.
+
+  Pairing the reclaiming with the writing starves a quiet symbiont. It is
+  never dirty, so it never flushes, so nothing ever collects -- while the
+  beat itself allocates every tick, forever. Seen on staging on 2026-08-16
+  as an idle tree at 1.6GB, climbing about 860MB an hour against a 367KB
+  image, where the busy one beside it sat at 23MB on the same commit.
+
+  Reclaiming on a beat of its own costs a busy symbiont a collection it was
+  going to do anyway, and a quiet one the only collection it will ever get.
+  ```
+  {:effect (fn [&] (gccollect))})
 
 (defn heart-beat
   ```
