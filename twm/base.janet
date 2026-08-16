@@ -27,8 +27,8 @@
         (let [now (os/clock)
               t (math/floor now)
               p (string (mod now 1))]
-          (eprin (dt/format-date-time t) "." (slice p 2 7) " - ")
-          (eprint ;msg))) "log")))
+          (eprint (string (dt/format-date-time t) "." (slice p 2 7)
+                          " - " ;msg)))) "log")))
 
 (defn diag
   "Create a redacted diagnostic logging event.
@@ -43,8 +43,8 @@
         (let [now (os/clock)
               t (math/floor now)
               p (string (mod now 1))]
-          (eprin (dt/format-date-time t) "." (slice p 2 7) " - DIAG ")
-          (eprint ;msg))) "diagnostic")))
+          (eprint (string (dt/format-date-time t) "." (slice p 2 7)
+                          " - DIAG " ;msg)))) "diagnostic")))
 
 (defn logr
   "Create logging event from the message `msg`."
