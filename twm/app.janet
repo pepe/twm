@@ -348,19 +348,28 @@ dynamics as set by *rpc-defines*.```
         (if-let [conn (get (fiber/getenv fiber) :conn)]
           (do
             (def err (fiber/last-value fiber))
-            (eprint name " HTTP Supervisor: " err)
-            (when (dyn :debug) (debug/stacktrace fiber))
-            (protect
-              (:write conn
-                      (http/internal-server-error
-                        (string "Internal Server Error: " err))))
+            # A reader that has gone is how a stream ordinarily ends, and
+            # saying so is neither news nor a fault. It is still worth
+            # closing: the connection is ours to give back whether or not
+            # anyone is owed an answer on it.
+            (unless (http/closed-err? err)
+              # Printed rather than concatenated. A failure's value need
+              # not be a string, and a tuple joined onto a string says
+              # `<tuple 0x...>` -- an address, in place of the one thing
+              # the line exists to carry.
+              (eprintf "%s HTTP Supervisor: %q" name err)
+              (when (dyn :debug) (debug/stacktrace fiber))
+              (protect
+                (:write conn
+                        (http/internal-server-error
+                          (string "Internal Server Error: " err)))))
             # Neither the answer nor the closing is allowed to raise. A
             # vacated space hands its accepting fiber's failure here, and
             # what that fiber inherited under :conn is a connection that
             # has already been answered and closed, if it is one at all.
             (protect (:close conn)))
           (when (dyn :debug)
-            (eprint name " HTTP Supervisor: " (fiber/last-value fiber))))))
+            (eprintf "%s HTTP Supervisor: %q" name (fiber/last-value fiber))))))
     (. "http " http)))
 
 (define-watch HTTP
