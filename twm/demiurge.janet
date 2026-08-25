@@ -725,7 +725,30 @@
           (produce (^inc :total) (if pass (^inc :passed) (^failed path)))
           (if-not pass (array/push failing f))
           (ev/sleep 0.2)
-          (produce (^peer/stop :tree)))
+          (produce (^peer/stop :tree))
+          # Asked is not gone, and the next file's `ClearData` must not run
+          # while the last file's tree is still holding its store. Stopping
+          # flushes the image as its final act, so the outgoing tree is
+          # writing the very file the incoming one is about to delete --
+          # and a delete against a handle another process holds is refused
+          # outright on Windows. `ClearData` then fails, the fresh tree
+          # `init`s from the last suite's image, and every count a suite
+          # asserts is somebody else's. That is the whole of why this
+          # suite's results moved from run to run.
+          #
+          # `peer/running` is the only honest signal: `^peer/run` clears it
+          # after `os/proc-wait` returns, which is the process actually
+          # reaped rather than merely asked. The wait is bounded because
+          # `^peer/insist` ends a peer that outstays `peer/patience`, and
+          # giving up says so rather than hanging the whole run.
+          (var waited 0)
+          (while (and (peer/running :tree) (< waited (+ peer/patience 2)))
+            (ev/sleep 0.05)
+            (+= waited 0.05))
+          (when (peer/running :tree)
+            (produce
+              (logr "  the tree outstayed its stop; " path
+                    " leaves its data to the next file"))))
         (produce
           TestReport
           (^aether @{:op :result :body {:scope scope :failing failing}})
