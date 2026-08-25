@@ -25,6 +25,46 @@
                  :name (old :name)))))
   state)
 
+(defn ^peer/renew
+  ```
+  Points the line held for `peer` at `address`, unless that is where it
+  points already.
+
+  A client redials by itself: `:open` lets go of whatever line it holds
+  and connects again, so a peer that merely restarted needs nothing done
+  to it. What `:open` cannot do is connect somewhere *else* -- it reaches
+  for the `:host` and `:port` the client was built with, and those are the
+  one thing a peer's new process may have changed. A registration is the
+  only moment anyone says where a peer now listens, and refusing that news
+  because a client already stands in the slot is how a mover is dialled at
+  its old address for as long as it runs.
+
+  So the line is disturbed only when the address is news. Registering is
+  routine -- a listener renews its own every minute -- and closing a
+  working connection on each of those would be churn wearing a fix's
+  clothes, paid on the beat forever.
+
+  What is left behind is the address rather than a client, which is what
+  `^peer/connect` builds from and the same shape `^peer/restore` leaves on
+  the way out: a slot holding a string means one thing whichever end of a
+  peer's life put it there.
+
+  The close is attempted, not required. A peer that has moved is a peer
+  whose old line is likely already gone, and a close that raises must not
+  keep the new address out of the slot.
+  ```
+  [peer address]
+  (make-update
+    (fn [_ state]
+      (def old (state peer))
+      (if (table? old)
+        (unless (= address (string (old :host) ":" (old :port)))
+          (protect (:close old))
+          (put state peer address))
+        (put state peer address))
+      state)
+    (. "renew " peer)))
+
 (defn ^peer/connect
   "Connects to one peer"
   [peer & succ]
