@@ -118,6 +118,18 @@
           (put state peer (string (ep :host) ":" (ep :port))))))
     (. "remove peer " peer)))
 
+(defn- peer/places
+  ```
+  Every place `peer` holds -- the one it answers to by name, and any it
+  was given to keep besides.
+
+  One reading of this, so that what a peer may report free and what is
+  handed back on its behalf cannot drift apart.
+  ```
+  [state peer]
+  [peer ;(keys (get (((state :nav/symbiont) peer) (state :config))
+                    :spaces {}))])
+
 (defn ^place/return
   ```
   Asks the guardian of `peer`, if one is still standing, to take back the
@@ -145,10 +157,18 @@
   address it bound, so the peer raised next in its place cannot listen,
   and the guardian standing behind it is never told to take the place
   back -- one process that will not go takes a door down with it.
+
+  Ending it frees the addresses but not the telling. A place is reported
+  free by whoever let it go, and a peer ended where it stood never says
+  anything again, so the ending speaks in its stead. That only the holder
+  may report is a rule against reaching for a door somebody still holds;
+  after a kill that took, there is no such door left to reach for, and
+  this is the one moment the demiurge knows the holder is gone because it
+  is the one that ended it.
   ```
   [peer]
   (make-watch
-    (fn [&]
+    (fn [_ state _]
       (def asked (peer/running peer))
       (producer
         (ev/sleep peer/patience)
@@ -157,7 +177,12 @@
         # Only the process actually asked is this one's to end.
         (when (and asked (= asked (peer/running peer)))
           (produce (log peer " did not go when asked; ending it"))
-          (protect (os/proc-kill asked)))))
+          # Handing the places back is the kill's to do, and only if it
+          # took: a kill that failed leaves a peer that is still holding.
+          (when (first (protect (os/proc-kill asked)))
+            (each place (peer/places state peer)
+              (produce (log peer " was ended; " place " is free")
+                       (^place/return place)))))))
     (. "insist " peer)))
 
 (defn ^peer/stop
@@ -283,11 +308,7 @@
               [true {:op :left :place place}]
               (do
                 (assert (and (keyword? place)
-                             (or (= place group)
-                                 (index-of place
-                                           (keys (get (((state :nav/symbiont) group)
-                                                        (state :config))
-                                                      :spaces {})))))
+                             (index-of place (peer/places state group)))
                         (. "Aether left from " group " is not permitted."))
                 (produce (log group " reports " place " free")
                          (^place/return place)))
