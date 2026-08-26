@@ -250,6 +250,42 @@ dynamics as set by *rpc-defines*.```
   (or (space/holding space)
       (let [held @{}] (put space/holding space held) held)))
 
+(def- space/answering
+  ```
+  Every connection a living space is currently answering on, keyed by the
+  space itself.
+
+  Beside the state for the same reason its listeners are: a live
+  connection is machinery, and the state is marshalled whole whenever it
+  hands work to a thread.
+
+  Keyed by the space rather than kept under its listener, because a place
+  that is taken back gets a new entry in `space/holding` and goes on
+  answering the connections it accepted before it was ever given up.
+  ```
+  @{})
+
+(defn space/answered
+  "The connections `space` is currently answering on, as a set."
+  [space]
+  (or (space/answering space)
+      (let [answered @{}] (put space/answering space answered) answered)))
+
+(defn space/attend
+  ```
+  Wraps a supervisor's `handling` so `space` knows every connection it is
+  answering on.
+
+  A listener names only the connections nobody has made yet. The ones
+  already accepted are what a keep-alive pool is made of, and without
+  this a space giving up its addresses has no way to speak of them.
+  ```
+  [space handling]
+  (fn attending [conn]
+    (put (space/answered space) conn true)
+    (defer (put (space/answered space) conn nil)
+      (handling conn))))
+
 (defn space/listen
   ```
   Opens one of `space`'s addresses, of `kind`, on `url`, feeding `chan`.
@@ -282,6 +318,50 @@ dynamics as set by *rpc-defines*.```
     (when-let [listener (held :listener)]
       (protect (:close listener)))
     (put held :listener nil))
+  space)
+
+(defn space/shed
+  ```
+  Closes the connections `space` is answering on, sparing the one being
+  answered on now.
+
+  For a symbiont that goes on living after giving a place up, which is
+  the only one that needs this. Closing the listener sheds the
+  connections nobody has made yet; it says nothing about the ones already
+  accepted, and a browser that reached this place before the handover
+  holds a pool of keep-alive sockets to this very process. gp answers
+  every one of them in a loop that ends when the reader goes, and a
+  socket outlives the listener that accepted it -- so the beat's request
+  for `/content` travels back down one of them and is answered by a
+  symbiont that has already stepped out of the door. It is answered
+  convincingly, too: a guardian that sees a session offers the way in all
+  over again, while whoever rose into the place stands behind a door
+  nobody knocks on. Which socket a browser reaches for is its own affair,
+  so this came and went and looked like a race in the thicket.
+
+  The connection spared is the one being answered on, which is the
+  handover's own reply, still being written. That an established
+  connection outlives its listener is what makes sparing it possible.
+
+  It is not part of letting go, and a symbiont on its way out must not do
+  it. Closing a live stream from a fiber that is not the one writing it
+  reaches into an overlapped write the socket still owns, and a process
+  already tearing down does not survive it -- where the addresses are
+  given up for good, the connections go with the process and need no
+  help. Only a handover both keeps the process and must silence it.
+
+  Only the membrane's connections are shed. A mycelium address is dialled
+  by peers that were introduced to this place, not by anyone holding a
+  pool, and what reaches a guardian's stale client is a push the tree
+  stops sending the moment the risen symbiont registers in its stead.
+  ```
+  [space]
+  (def answering (dyn :conn))
+  (def answered (space/answered space))
+  (each conn (keys answered)
+    (unless (= conn answering)
+      (put answered conn nil)
+      (protect (:close conn))))
   space)
 
 (defn ^space/vacate
@@ -339,7 +419,7 @@ dynamics as set by *rpc-defines*.```
       (produce (logf "Starting %s HTTP server on %s, port %s" name ;(server/host-port http)))
       (http/supervisor
         chan
-        (http/on-connection parser)
+        (space/attend space (http/on-connection parser))
         [:product events] (produce ;events)
         [:error fiber]
         # A fiber can fail with no connection to answer on: the accepting

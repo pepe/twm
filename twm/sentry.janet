@@ -224,10 +224,19 @@
   Vacating the listener wakes its accepting fiber; doing that while the
   response is still being written can close the request before its headers
   leave the sentry.
+
+  The shedding belongs here and nowhere else. This is the one moment a
+  symbiont stops answering for a place and goes on living, so it is the
+  one moment the connections it has already accepted have to be taken
+  away from it -- everywhere else the addresses are given up the process
+  goes too, and its sockets with it. It runs in the fiber writing the
+  handover, which is how the reply being written is the one connection
+  spared.
   ```
   [view]
   (when (view :guards)
-    (space/let-go (view :space))))
+    (space/let-go (view :space))
+    (space/shed (view :space))))
 
 (defn- handover/after-response
   "Releases and spawns only after a sentry response has been written."
