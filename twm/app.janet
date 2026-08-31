@@ -1039,12 +1039,42 @@ dynamics as set by *rpc-defines*.```
       (=> :view :notify topic (>add chan)))
     (. "subscribe notify " topic)))
 
+(def notify/patience
+  ```
+  Seconds a subscriber is given to take its notification before the send
+  goes on without it.
+
+  A subscription is one-shot -- every send clears the topic and a living
+  reader re-subscribes as it comes round its loop -- so a channel that
+  cannot take is not a reader that is busy, it is a reader that is gone. A
+  handler that died keeps its place in `:notify` and nothing else ever
+  removes it, while its channel holds fewer slots than the topics it was
+  subscribed to: a few ordinary notifications fill it and it never empties
+  again.
+
+  Short for the same reason as `dereg/patience`. The reader is a fiber in
+  this very process, so a take that has not happened in seconds will not
+  happen. An unbounded give here is what let one dead stream stop a
+  symbiont from ever standing down: the give sits in front of the goodbye,
+  the Aether, and the handing back of the door, so nothing that follows it
+  is reached until it returns.
+  ```
+  2)
+
 (defn ^notify/send-one
-  "Sends one topic notification to a subscribed channel."
+  ```
+  Sends one topic notification to a subscribed channel.
+
+  Bounded, and the failure is swallowed rather than raised. A subscriber
+  that will not take is one this send has no further use for, and the
+  clear that follows every send is what removes it. Raising instead would
+  leave the remaining subscribers untold, which is the opposite of what a
+  send is for.
+  ```
   [chan topic]
   (make-effect
     (fn [&]
-      (:give chan topic))
+      (protect (ev/with-deadline notify/patience (:give chan topic))))
     (. "send one notify " topic)))
 
 (defn ^notify/clear

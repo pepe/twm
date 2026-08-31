@@ -366,13 +366,38 @@
     (def-state _
       :view :activity (>put peer dt))))
 
+(def ping/patience
+  ```
+  Seconds a peer is given to answer its heartbeat before the beat is
+  counted missed.
+
+  `try` catches an error but not a parking, and those are two different
+  peers. One that has died refuses the connection and answers with an
+  error, which is counted, and after three brings a restart. One that is
+  alive and no longer serving accepts the connection and answers nothing
+  at all: unbounded, that ping never returns, no beat is ever counted
+  missed, and `CheckPeers` -- which comes round on this same beat -- never
+  runs again. The watch that exists to notice a stalled peer is stopped by
+  the very peer it was watching, and its other arm, the one that stops a
+  peer gone quieter than the thicket's patience, never gets to look.
+
+  Shorter than `peer/patience`: this is a question asked over loopback,
+  not a departure being waited on.
+  ```
+  3)
+
 (defn ^peer/ping
-  "Pings one peer and updates its missed heartbeat count."
+  ```
+  Pings one peer and updates its missed heartbeat count.
+
+  Bounded, so that a peer which is alive but no longer answering becomes a
+  miss like any other instead of a park that takes the heartbeat with it.
+  ```
   [peer]
   (make-watch
     (fn [_ state _]
       (try
-        (match (:ping (state peer))
+        (match (ev/with-deadline ping/patience (:ping (state peer)))
           :pong
           [(^peer/clear peer) (^peer/no-active peer)]
           [:last-active (dt (epoch? dt))]

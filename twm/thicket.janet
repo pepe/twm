@@ -285,7 +285,11 @@
         (unless (first (protect (ev/with-deadline dereg/patience
                                   (dereg client name tenant))))
           (array/push unsaid peer)))
-      (protect (:close client))))
+      # Bounded for the same reason as the goodbye above. `protect`
+      # catches errors but not parking, and a close that parks holds
+      # the whole departure behind it -- the Aether, the handing back
+      # of the door, and every peer after this one in the loop.
+      (protect (ev/with-deadline dereg/patience (:close client)))))
   # Said after the closing rather than beside each failure: the whole point
   # is that this body must reach its end, and a log event is produced, not
   # written, so it cannot itself be what stops.
