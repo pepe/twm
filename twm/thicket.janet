@@ -200,6 +200,35 @@
      :watch (if announce AetherReady)}
     "save session"))
 
+(def register/at
+  ```
+  When each symbiont last registered on a peer, by peer name.
+
+  Kept so the gap to the *next* registration in the same boot can be said
+  outright. A symbiont's `^start` produces its tree registration and then,
+  through `after-reg`, its registration with whatever divines for it; those
+  two are ordinarily separated by 120-200us, and on the boots that went on
+  to wedge they collapsed to 20us, in either order.
+
+  That gap was legible only by accident: at 20us the two log lines were
+  landing in the same `write` window and tearing, which is what made those
+  boots conspicuous. Fixing the tearing (see `log`) takes the accident
+  away, so the measurement is made on purpose here instead.
+  ```
+  @{})
+
+(def register/window/tight
+  ```
+  Microseconds below which a boot's two registrations are called TIGHT.
+
+  Drawn from five boots, not from theory: three that collapsed to ~20us
+  and two that took 120us and 200us. Fifty sits between them with room on
+  both sides. It is a mark to grep for, not a threshold anything acts on
+  -- no code branches on this, and it should not until the link from a
+  tight window to a departure that will not run is actually established.
+  ```
+  50)
+
 (defn ^tenant/register
   ```
   Registers for whatever `peer` pushes on behalf of `tenant`.
@@ -218,6 +247,7 @@
     (fn [_ state _]
       (def {:name name} state)
       (default tenant ((>or (=<> :guards) (=<> :name)) state))
+      (put register/at peer (os/clock))
       [(diag "register name=" name " tenant=" tenant " peer=" peer
              " target-present=" (truthy? (state peer)))
        (log tenant " registers on " peer)
