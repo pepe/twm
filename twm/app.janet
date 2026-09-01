@@ -437,7 +437,10 @@ dynamics as set by *rpc-defines*.```
               # not be a string, and a tuple joined onto a string says
               # `<tuple 0x...>` -- an address, in place of the one thing
               # the line exists to carry.
-              (eprintf "%s HTTP Supervisor: %q" name err)
+              # One write, as in `log`: this stderr is shared with every
+              # other peer, and a supervisor line torn in half is an error
+              # report that has lost the half naming what went wrong.
+              (eprin (string/format "%s HTTP Supervisor: %q\n" name err))
               (when (dyn :debug) (debug/stacktrace fiber))
               (protect
                 (:write conn
@@ -449,7 +452,8 @@ dynamics as set by *rpc-defines*.```
             # has already been answered and closed, if it is one at all.
             (protect (:close conn)))
           (when (dyn :debug)
-            (eprintf "%s HTTP Supervisor: %q" name (fiber/last-value fiber))))))
+            (eprin (string/format "%s HTTP Supervisor: %q\n"
+                                  name (fiber/last-value fiber)))))))
     (. "http " http)))
 
 (define-watch HTTP
