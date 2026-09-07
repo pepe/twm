@@ -55,7 +55,7 @@
       (producer
         (def {:tree tree :name name} state)
         (def tenant (or (state :tenant) name))
-        (produce (diag "session-end-begin name=" name " tenant=" tenant))
+        (produce (log "session-end-begin name=" name " tenant=" tenant))
         (protect (:session/new tree tenant ""))
         (var settled (session/settled? tree tenant ""))
         (var tries 0)
@@ -63,7 +63,7 @@
           (ev/sleep 0.02)
           (++ tries)
           (set settled (session/settled? tree tenant "")))
-        (produce (diag "session-end-settled name=" name " tenant=" tenant
+        (produce (log "session-end-poll-finished name=" name " tenant=" tenant
                        " settled=" settled " tries=" tries))
         (if (present? after) (produce ;after))))
     "end session"))
@@ -202,6 +202,7 @@
   ```
   [_ state _]
   (def name (state :name))
+  (eprin (string name " logout/stand-down-begin\n"))
   (if-let [space (place/of state name)] (space/let-go space))
   # Standing down is leaving, and leaving is saying so to the peers this
   # symbiont registered with. Without it the tree keeps a client to a
@@ -285,8 +286,10 @@
     (merge <handover/>
            (http/cookie "session" "; Max-Age=0; Path=/;"))
     (ev/take done)
+    (eprin (string (view :name) " logout/response-ready\n"))
     (:write (dyn :sse-conn) transition)
     (protect (:flush (dyn :sse-conn)))
+    (eprin (string (view :name) " logout/transition-written\n"))
     (:give sent true)))
 
 (defn- logout/standdown-after
@@ -312,7 +315,7 @@
   (def done (ev/chan 1))
   (def sent (ev/chan 1))
   (def settled (logout/settled done))
-  (produce (diag "logout-request name=" (view :name)
+  (produce (log "logout-request name=" (view :name)
                  " guarded=" (truthy? (view :guards))
                  " own-space=" (truthy? (view :space))
                  " session-cap=" (truthy? (view :cap/session))))
