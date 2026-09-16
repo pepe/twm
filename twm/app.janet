@@ -1,5 +1,8 @@
 (import ./base :prefix "" :export true)
 (import gp/net/uri :export true)
+(import ./subscription :export true)
+(import ./readiness :export true)
+(import ./handover :export true)
 
 (def . "string" string)
 
@@ -120,7 +123,9 @@ dynamics as set by *rpc-defines*.```
   one write.
   ```
   [_ state]
-  (put state :dirty true))
+  (put state :dirty true)
+  (when-let [view (state :view)]
+    (put view :projection/revision (inc (get view :projection/revision 0)))))
 
 (define-event Flush
   ```
@@ -130,9 +135,11 @@ dynamics as set by *rpc-defines*.```
   writing is a natural moment to reclaim as well as record -- but it is not
   the only one it may be, and `Collect` says why.
   ```
-  {:watch (fn [&] [(log "Flushing store") Clean])
-   :effect (fn [_ {:store store} _]
-             (:flush store)
+  {:watch (log "Flushing store")
+   :effect (fn [_ state _]
+             (:flush (state :store))
+             # Failed persistence must leave the store dirty for the next attempt.
+             (put state :dirty false)
              (gccollect))})
 
 (define-event Collect
@@ -314,6 +321,7 @@ dynamics as set by *rpc-defines*.```
   connections outlive their listener, so the reply still arrives.
   ```
   [space]
+  (when-let [view (space :view)] (readiness/settle view :cancelled "space vacated"))
   (each held (values (space/held space))
     (when-let [listener (held :listener)]
       (protect (:close listener)))
@@ -384,7 +392,8 @@ dynamics as set by *rpc-defines*.```
     (fn [&]
       (each [kind held] (pairs (space/held space))
         (unless (held :listener)
-          (space/listen space kind (held :chan) (held :url)))))
+          (space/listen space kind (held :chan) (held :url))))
+      (when-let [view (space :view)] (readiness/settle view :ready)))
     (. "resume " (space :name))))
 
 (defn ^space/http
@@ -402,6 +411,11 @@ dynamics as set by *rpc-defines*.```
   (assert http "HTTP host and port must be set, exiting.")
   (assert (table? routes) "Routes must be table, exiting.")
   (if static (assert public "Public path must be set, exiting."))
+  (def routes (merge routes
+                     {"/_ready" (fn [_]
+                                 (http/success (json/encode (readiness/status view))
+                                               {"Content-Type" "application/json"
+                                                "Cache-Control" "no-store"}))}))
   (def parser
     (http/parser
       (cond-> routes
@@ -589,6 +603,13 @@ dynamics as set by *rpc-defines*.```
   (fn [& args]
     (produce ;(handler ;args))))
 
+(defn applied-resp
+  "RPC middleware returning :ok only after command events have actually applied."
+  [handler]
+  (fn [& args]
+    (produce/applied (handler ;args))
+    :ok))
+
 (defn ^rpc
   ```
   Constructs producer with running rpc server.
@@ -674,17 +695,14 @@ dynamics as set by *rpc-defines*.```
   (seq [space :in (spaces state) :when (space :rpc)] (^space/rpc space psk deb)))
 
 (defn on-error
-  "Manages errors for events' manager. Transacts detail logging."
-  [manager err]
-  (:transact
-    manager
-    ;(match err
-       (msg (string? msg)) (log msg)
-       ([at event f] (keyword? at) (valid? event) (fiber? f))
-       (cond-> @[(logr (string at " failed for " (event :name)
-                               " with error: " (fiber/last-value f)))]
-               (dyn :debug) (array/push (stacktrace f)))
-       (error "Unexpected error type"))))
+  "Reports failures even in production and inside a failed receipt scope."
+  [_manager err]
+  (match err
+    ([at event f] (keyword? at) (valid? event) (fiber? f))
+    (do (eprin (string at " failed for " (event :name)
+                       ": " (fiber/last-value f) "\n"))
+        (when (dyn :debug) (debug/stacktrace f)))
+    (eprin (string "Event manager failure: " err "\n"))))
 
 # Test helpers
 
@@ -1029,28 +1047,12 @@ dynamics as set by *rpc-defines*.```
        freeze))
 
 (defn <script/redirect/>
-  ```
-  hg representation of the redirect script.
-
-  It knocks before it goes. A handover closes the door before it answers,
-  so until the rising symbiont binds there is nobody behind the address at
-  all, and a browser sent there in that gap meets a refusal rather than a
-  wait wherever a closed port is answered honestly. Waiting a fixed
-  moment instead only moves the guess: a symbiont is usually ready in a
-  tenth of a second and has been seen to take four.
-
-  The handover page waits one second for the receiving symbiont to take its
-  door, then enters it. There is no browser-side polling here.
-  ```
-  [&opt address]
+  "Navigates only after the target reports readiness; optionally require its role."
+  [&opt address role]
   (default address "/")
   [:script
-   (hg/raw
-     (. ``var mtbDoor = "`` address ``";
-          function mtbEnter() {
-            setTimeout(function () { document.location = mtbDoor; }, 1000);
-          }
-          mtbEnter();``))])
+   (hg/raw (handover/wait-script address role
+             (string "document.location=" (json/encode address) ";"))) ])
 
 (defn sanitize-nl
   "Replaces \n for <br>"
@@ -1115,19 +1117,43 @@ dynamics as set by *rpc-defines*.```
   "Sends a topic to all subscribers and clears the subscription queue."
   [topic]
   (make-watch
-    (fn [_ {:view {:notify notify}} _]
-      (if-let [chans (notify topic)]
+    (fn [_ {:view view} _]
+      (subscription/publish view topic)
+      (if-let [chans (get-in view [:notify topic])]
         [;(seq [chan :in chans]
             (^notify/send-one chan topic))
          (^notify/clear topic)]
         []))
     (. "send notify " topic)))
 
+(defn view/stream
+  "Owns a durable subscription, waits for readiness, renders, and always cleans up."
+  [view topics initial render &opt leaving]
+  (fn [conn]
+    (def sub (subscription/open view topics :stage/stand-down))
+    (var finished false)
+    (def disconnected
+      (ev/go (fn []
+               (protect (:read conn 1))
+               (unless finished (subscription/close sub))
+               nil) nil (ev/chan 1)))
+    (defer
+      (do (set finished true)
+          (subscription/close sub)
+          (protect (ev/cancel disconnected :stream-finished)))
+      (readiness/await view 10 (sub :closed-signal))
+      ((http/stream
+         (initial)
+         (while (def topic (subscription/take sub))
+           (if (= topic :stage/stand-down)
+             (do (when leaving (leaving)) (break))
+             (render topic)))) conn))))
+
 (defn produce/wait
-  ```
-  Subscribes `chan`, produces `event`, waits for `topic`, and returns `result`.
-  ```
-  [chan topic event result]
-  (produce (^notify/subscribe chan topic) event)
-  (ev/take chan)
-  result)
+  "Waits for an applied command and its local projection, with bounded cleanup."
+  [_chan topic event result]
+  (def sub (subscription/open (dyn :view) [topic]))
+  (defer (subscription/close sub)
+    (produce/applied [event])
+    (ev/with-deadline 8 (subscription/take sub))
+    result))

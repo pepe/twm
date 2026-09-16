@@ -1,4 +1,5 @@
 (import ./app :prefix "" :export true)
+(import ./projection :export true)
 
 (defn- peer/reset-client
   ```
@@ -89,49 +90,25 @@
            # Giving up says why. A peer the thicket cannot reach is one it
            # cannot tell anything afterwards, and "cannot connect" without
            # a reason is the kind of silence that costs days.
-           (match [(protect (:open (state peer))) tries]
+           (match [(protect (ev/with-deadline 2 (:open (state peer)))) tries]
              [[true _] _] (produce (log name " connected to " peer))
              [[false err] 10]
-             (produce (log name " cannot connect to " peer ": " err))
+             (do (set failed true)
+                 (produce (log name " cannot connect to " peer ": " err)))
              _ (peer/reset-client state peer))
            (ev/sleep (* (++ tries) 0.1)))
-         (if (present? succ) (produce ;succ))))}
+         (if (and (not failed) (present? succ)) (produce ;succ))))}
     (. "connect peer " peer)))
 
 (defn ^connect-peer
-  "Connects to one peer"
+  "Compatibility entry point using the single peer-connection implementation."
   [peer &opt succ]
-  (make-event
-    {:update
-     (fn [_ state]
-       (def {:psk psk :name name} state)
-       (def url (state peer))
-       (when (string? url)
-         (def [host port] (server/host-port url))
-         (put state peer
-              (make rpc/Client
-                    :host host :port port
-                    :psk psk :name name))))
-     :watch
-     (fn [_ state _]
-       (producer
-         (def {:name name} state)
-         (var failed false)
-         (var tries 0)
-         (while
-           (match [(protect (:open (state peer))) tries]
-             [[true _] _] (produce (log name " connected to " peer))
-             [[false err] 10]
-             (produce (log name " cannot connect to " peer ": " err))
-             _ (peer/reset-client state peer))
-           (ev/sleep (* (++ tries) 0.1)))
-         (if succ (produce ;succ))))}
-    (. "connect peer " peer)))
+  (apply ^peer/connect peer (if (indexed? succ) succ (if succ [succ] []))))
 
 (defn ^connect-peers
   "Connects to all the peers"
   [succ &opt fail]
-  (default fail succ)
+  (default fail (log "Required peer connection failed"))
   (make-event
     {:update
      (fn [_ state]
@@ -155,7 +132,7 @@
                           " client=" (truthy? (table? (state peer)))))
            (var tries 0)
            (while
-             (match [(protect (:open (state peer))) tries]
+             (match [(protect (ev/with-deadline 2 (:open (state peer)))) tries]
                [[true _] _] (produce (diag "connect-ok name=" name
                                             " peer=" peer " tries=" tries)
                                          (log name " connected to " peer))
@@ -230,28 +207,16 @@
   50)
 
 (defn ^tenant/register
-  ```
-  Registers for whatever `peer` pushes on behalf of `tenant`.
-
-  A symbiont registers under its own name, never under the name of a place
-  it happens to be standing in. A guardian hands such a place over the
-  moment the symbiont it guards rises, and a registration pointing there
-  would be answered by the risen symbiont from then on -- the guardian
-  would keep serving on a capability nobody could tell it had expired.
-
-  `announce` asks the saved capability to report readiness only after its
-  update; it is used for a symbiont's first registration.
-  ```
-  [peer &opt tenant announce]
+  "Registers outside the manager, then installs the capability before successors."
+  [peer &opt tenant announce & after]
   (make-watch
     (fn [_ state _]
-      (def {:name name} state)
-      (default tenant ((>or (=<> :guards) (=<> :name)) state))
+      (def name (state :name))
+      (default tenant (or (state :guards) name))
       (put register/at peer (os/clock))
-      [(diag "register name=" name " tenant=" tenant " peer=" peer
-             " target-present=" (truthy? (state peer)))
-       (log tenant " registers on " peer)
-       (^session/cap (:register (state peer) name tenant) announce)])
+      (producer
+        (def cap (rpc/call (state peer) :register [name tenant] true))
+        (produce (^session/cap cap announce) ;(or after []))))
     (. "register " peer)))
 
 (defn ^register
@@ -336,34 +301,14 @@
   :ok)
 
 (defn ^tenant/refresh-view
-  "Refreshes the data in view from tree for the tenant"
+  "Requests an asynchronous Tree snapshot for the tenant and its living spaces."
   [& colls]
-  (make-update
-    (fn [_ state]
-      (def {:tree tree :tenant tenant :name name} state)
-      # Tree's tenant RPC schema is keyword-only. Older or hand-built
-      # configurations may carry a string, and guardians may have no
-      # explicit tenant while they are being assembled.
-      (def raw-tenant (or tenant name))
-      (def rpc-tenant (if (and raw-tenant (not (keyword? raw-tenant)))
-                        (keyword raw-tenant)
-                        raw-tenant))
-      (when rpc-tenant
-        (each place [state ;(values (get state :spaces {}))]
-          (if-let [view (place :view)]
-            (each coll colls
-              (put view coll (coll tree rpc-tenant)))))))
-    (. "refresh view " ;colls)))
+  (projection/^refresh colls))
 
 (defn ^peer/refresh-view
-  "Refreshes the data in view from tree for the peer"
+  "Requests an asynchronous Tree snapshot for the current peer's tenant."
   [& colls]
-  (make-update
-    (fn [_ state]
-      (def {:tree tree :view view :name name} state)
-      (each coll colls
-        (put view coll (coll tree name))))
-    (. "refresh view " ;colls)))
+  (projection/^refresh colls))
 
 (defn fixtures
   "Combine members of the `sets` to get `n` uniq combinations"

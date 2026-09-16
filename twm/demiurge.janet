@@ -1,4 +1,8 @@
 (import ./thicket :prefix "")
+(import ./lifecycle)
+(import ./operation :export true)
+(import ./artifact :export true)
+(import gp/atomic :export true)
 (use spork/sh-dsl spork/sh
      spork/declare-cc spork/cc spork/build-rules)
 
@@ -63,13 +67,13 @@
   the terminal would take the keystrokes meant for the demiurge.
   ```
   [state peer cmd flags]
-  (def fs (keyword flags :e))
-  (def env
-    (merge (os/environ)
-           {"CONF" (peer/spit-conf state peer)
-             :in :pipe
-             :out :pipe}))
-  (os/spawn cmd fs env))
+  (if-let [spawn (state :spawn-process)]
+    (spawn cmd flags)
+    (do
+      (def fs (keyword (string/replace-all "x" "" (string flags)) :e))
+      (def env (merge (os/environ)
+                      {"CONF" (peer/spit-conf state peer) :in :pipe :out :pipe}))
+      (os/spawn cmd fs env))))
 
 (defn ^save-sha
   "Event that saves git sha"
@@ -81,11 +85,11 @@
 
 (define-event SetReleasedSHA
   "Writes the current SHA to file"
-  {:update
-   (fn [_ {:view view}] (put view :release-sha (view :sha)))
-   :effect
-   (fn [_ {:view {:sha sha} :release-path rp} _]
-     (if sha (spit (path/abspath (path/join rp "release.sha")) sha)))})
+  {:effect
+   (fn [_ {:view view :release-path rp} _]
+     (when-let [sha (view :sha)]
+       (atomic/write (path/abspath (path/join rp "release.sha")) sha)
+       (put view :release-sha sha)))})
 
 (define-watch PullGetSHA
   "Save in the state the latest shas of the repository"
@@ -101,20 +105,18 @@
    :watch PullGetSHA})
 
 (defn ^peer/remove
-  "Removes a peer and the heartbeat state that belonged to its process."
-  [peer]
+  "Clears reaped ownership, ignoring completions from an older generation."
+  [peer &opt generation]
   (make-update
     (fn [_ state]
-      (def {:view {:spawned spawned :misses misses :activity activity}} state)
-      # Heartbeats identify a process only by its peer name. Keeping either
-      # value after that process exits lets a replacement inherit an old
-      # timeout or missed-ping count while it is still booting.
-      (put misses peer nil)
-      (put activity peer nil)
-      (when (spawned peer)
+      (when (lifecycle/current? state peer generation)
+        (def {:view {:spawned spawned :misses misses :activity activity}} state)
+        (put misses peer nil)
+        (put activity peer nil)
         (put spawned peer nil)
         (def ep (state peer))
-        (if (dictionary? ep)
+        (when (dictionary? ep)
+          (protect (:close ep))
           (put state peer (string (ep :host) ":" (ep :port))))))
     (. "remove peer " peer)))
 
@@ -131,75 +133,58 @@
                     :spaces {}))])
 
 (defn ^place/return
-  ```
-  Asks the guardian of `peer`, if one is still standing, to take back the
-  place `peer` has just left.
-
-  The asking happens on the peer's departure rather than on its request to
-  be relieved, so the address is free before anyone reaches for it. A
-  guardian that is not running needs no telling: it will be born into that
-  place by the Aether as it always was.
-  ```
+  "Returns a confirmed vacant place to its guardian without blocking the manager."
   [peer]
-  (make-effect
+  (make-watch
     (fn [_ state _]
       (def guardian (get-in state [:config :symbionts peer :guarded-by]))
-      (when (and guardian (get-in state [:view :spawned guardian]))
-        (protect (:space/resume (state guardian) peer))))
+      (def client (if guardian (state guardian)))
+      (producer
+        (when (and client (dictionary? client))
+          (def [ok err] (protect (ev/with-deadline 3 (rpc/call client :space/resume [peer] true))))
+          (unless ok (produce (log "Cannot return " peer " to " guardian ": " err))))))
     (. "return place of " peer)))
 
 (defn ^peer/insist
-  ```
-  Sees that a peer asked to stop has actually gone, and ends it if it
-  has not.
-
-  A peer that outstays its asking is not merely late. It holds every
-  address it bound, so the peer raised next in its place cannot listen,
-  and the guardian standing behind it is never told to take the place
-  back -- one process that will not go takes a door down with it.
-
-  Ending it frees the addresses but not the telling. A place is reported
-  free by whoever let it go, and a peer ended where it stood never says
-  anything again, so the ending speaks in its stead. That only the holder
-  may report is a rule against reaching for a door somebody still holds;
-  after a kill that took, there is no such door left to reach for, and
-  this is the one moment the demiurge knows the holder is gone because it
-  is the one that ended it.
-  ```
-  [peer]
+  "Bounds departure of the captured process; its observer alone confirms exit."
+  [peer &opt generation]
   (make-watch
     (fn [_ state _]
       (def asked (peer/running peer))
       (producer
-        (ev/sleep peer/patience)
-        # A place rarely stays empty for long: the one asked to go may
-        # have gone and another risen in its stead while this waited.
-        # Only the process actually asked is this one's to end.
-        (when (and asked (= asked (peer/running peer)))
-          (produce (log peer " did not go when asked; ending it"))
-          # Handing the places back is the kill's to do, and only if it
-          # took: a kill that failed leaves a peer that is still holding.
-          (when (first (protect (os/proc-kill asked)))
-            (each place (peer/places state peer)
-              (produce (log peer " was ended; " place " is free")
-                       (^place/return place)))))))
+        (ev/sleep (get state :stop-timeout peer/patience))
+        (def current (peer/running peer))
+        (when (and current (or (not asked) (= asked current))
+                   (lifecycle/current? state peer generation))
+          (produce (log peer " did not exit; ending generation " generation))
+          (def [ok err] (protect (os/proc-kill current)))
+          (unless ok (produce (log "Cannot end " peer ": " err))))))
     (. "insist " peer)))
 
 (defn ^peer/stop
-  "Stops one peer"
+  "Requests departure without releasing ownership before the process is reaped."
   [peer]
   (make-event
-    {:watch [(^peer/remove peer) (^peer/insist peer)]
-     :effect
+    {:update (fn [_ state] (lifecycle/stop state peer))
+     :watch
      (fn [_ state _]
+       (def generation ((lifecycle/record state peer) :generation))
        (def pc (state peer))
-       (protect (:stop pc)
-                (:close pc)))}
+       [(^peer/insist peer generation)
+        (make-watch
+          (producer
+            (when (dictionary? pc)
+              (def [ok err] (protect (ev/with-deadline 3 (:stop pc))))
+              (unless ok (produce (log "Stop request for " peer " failed: " err)))
+              (protect (:close pc)))))] )}
     (. "stop peer " peer)))
 
 (define-event StopPeers
   "Sends stop RPC to all peers"
-  {:update (fn [_ {:view view}] (put view :ran false))
+  {:update (fn [_ state]
+             (put (state :view) :ran false)
+             (each peer (keys (get-in state [:view :lifetimes] {}))
+               (lifecycle/stop state peer)))
    :watch
    (fn [_ {:view {:spawned spawned}} _]
      (seq [[peer _] :pairs spawned] (^peer/stop peer)))})
@@ -221,121 +206,139 @@
     (. "no-active missed " peer)))
 
 (defn ^peer/save-spawned
-  "Saves spawned peer process"
-  [peer phase]
-  (make-event
-    {:update
-     (fn [_ {:view {:spawned spawned}}]
-       (put spawned peer phase))
-     :watch (log peer " reached " phase)}
+  "Saves readiness only for the current process generation."
+  [peer phase &opt generation]
+  (make-update
+    (fn [_ state]
+      (if generation
+        (lifecycle/ready state peer generation)
+        (put (get-in state [:view :spawned]) peer phase)))
     (. "save spawned peer " peer)))
 
 (defn ^peer/connect
-  "Connects to one peer"
-  [peer &opt succ]
+  "Connects to the current generation with a bounded retry budget."
+  [peer &opt succ generation]
   (make-event
     {:update
      (fn [_ state]
-       (def {:psk psk :name name} state)
-       (def url (state peer))
-       (when (string? url)
-         (def [host port] (server/host-port url))
-         (put state peer
-              (make rpc/Client
-                    :host host :port port
-                    :psk psk :name name))))
+       (when (lifecycle/current? state peer generation)
+         (def {:psk psk :name name} state)
+         (def url (state peer))
+         (when (string? url)
+           (def [host port] (server/host-port url))
+           (put state peer (make rpc/Client :host host :port port :psk psk :name name)))))
      :watch
      (fn [_ state _]
+       (def client (state peer))
        (producer
-         (def {:name name} state)
-         (var failed false)
-         (var tries 0)
-         (if-not (state :ping)
-           (while
-             (match [(protect (:open (state peer))) tries]
-               [[true _] _] (produce (log name " connected to " peer))
-               [[false _] 10]
-               (do
-                 (set failed true)
-                 (produce (log name " cannot connect to " peer ".")))
-               true)
-             (ev/sleep (* (++ tries) 0.1))))
-         # A peer that could not be reached has not reached the mycelium,
-         # whatever it says of itself. Calling it arrived would put it in
-         # the heartbeat's care, which would find it unreachable, miss it
-         # three times and restart a peer that was never unwell.
-         (if (and succ (not failed)) (produce succ))))}
+         (var connected false)
+         (loop [attempt :range [0 10]
+                :while (and (not connected) (lifecycle/current? state peer generation))]
+           (set connected (first (protect (ev/with-deadline 1 (:open client)))))
+           (unless connected (ev/sleep (* (inc attempt) 0.1))))
+         (when (and connected (lifecycle/current? state peer generation))
+           (produce (log peer " connected") (or succ Empty)))
+         (unless connected (produce (log peer " could not connect")))))}
     (. "connect peer " peer)))
 
 (defn ^peer/run
-  ```
-  Runs one peer, reads its Aether while alive, and observes its eventual exit.
-
-  The producer is not threaded. It reads a pipe and waits on a process,
-  which the event loop carries without one, and a thread would only be
-  handed a marshalled copy of the state -- a snapshot of `:spawned` that
-  goes stale the moment another peer is born.
-  ```
+  "Reserves one generation, observes it to reap, then permits a successor."
   [group &opt peer cmd flags]
+  (var generation nil)
+  (var launch nil)
+  (make-event
+    {:update (fn [_ state]
+               (def entry (lifecycle/record state group))
+               (when cmd (put entry :launch [peer cmd flags]))
+               (set launch (entry :launch))
+               (set generation (lifecycle/reserve state group)))
+     :watch
+     (fn [_ state _]
+       (when generation
+         (producer
+           (def [saved-peer saved-cmd saved-flags] (or launch []))
+           (default peer (or saved-peer group))
+           (var proc nil)
+           (var exit-code nil)
+           (def [ok failure]
+             (protect
+               (def [_ _ [ecmd eflags]] ((state :entries) peer))
+               (default cmd (or saved-cmd ecmd))
+               (default flags (or saved-flags eflags))
+               (def [identified active]
+                 (protect (when (and (state :build-path) (not (state :spawn-process)))
+                   (if (state :builder)
+                     (artifact/read-installed (first cmd))
+                     {:mode :interpreted :source (artifact/source (state :build-path))}))))
+               (set proc (peer/pipe-out state peer cmd flags))
+               (put (lifecycle/record state group) :active
+                    (if identified active {:status :unknown :failure (string active)}))
+               (put peer/running group proc)
+               (forever
+                 (def message (aether/read-message (proc :out)))
+                 (when (lifecycle/current? state group generation)
+                   (match message
+                     {:op :ready}
+                     (produce (^peer/connect group
+                                (^peer/save-spawned group :mycelium generation) generation))
+                     {:op :spawn :peer target :arg arg}
+                     (let [source (((state :nav/symbiont) group) (state :config))
+                           allowed @[;(keys (get source :spaces {})) (source :guarded-by)]]
+                       (assert (and (keyword? target) (string? arg) (index-of target allowed))
+                               (. "Aether spawn from " group " is not permitted."))
+                       (let [[_ _ [next-cmd next-flags]] ((state :entries) target)]
+                         (produce (^peer/run target target [;next-cmd arg] next-flags))))
+                     {:op :left :place place}
+                     (do
+                       (assert (index-of place (peer/places state group))
+                               (. "Aether left from " group " is not permitted."))
+                       (produce (^place/return place)))
+                     {:op :result} (produce (log "Aether result from " group))
+                     {:op op} (produce (log "Reserved Aether operation " op " from " group)))))))
+           (def ordinary-eof (and (string? failure)
+                                 (string/has-prefix? "Aether stream ended" failure)))
+           (when proc
+             # An invalid Aether frame is not allowed to strand its owner.
+             (unless (or ok ordinary-eof) (protect (os/proc-kill proc)))
+             # Spawn never uses :x: a nonzero exit is data, not an exception
+             # that skips cleanup. Exactly this observer waits on the handle.
+             (set exit-code (os/proc-wait proc))
+             (os/proc-close proc)
+             (when (= proc (peer/running group)) (put peer/running group nil)))
+           (produce
+             (make-event
+               {:update
+                (fn [_ state]
+                  (when (lifecycle/current? state group generation)
+                    (lifecycle/exited state group generation exit-code
+                                      (unless ordinary-eof failure))))
+                :watch
+                (fn [_ state _]
+                  (when (lifecycle/current? state group generation)
+                    [(log group " generation " generation " exited: " exit-code
+                          (if ordinary-eof "" (string " " failure)))
+                     (^peer/remove group generation)
+                     ;(if (= :stopped ((lifecycle/record state group) :desired))
+                        (map ^place/return (peer/places state group)) [])]))}
+               (. "reaped peer " group))))))}
+    (. "run peer " (or peer group))))
+
+(defn ^peer/restart
+  "Requests replacement; start intent coalesces until confirmed old-process exit."
+  [peer]
+  (make-watch [(^peer/stop peer) (^peer/run peer)] (. "restart peer " peer)))
+
+(defn ^peers/after-exit
+  "Runs successors only after all reserved generations have been reaped."
+  [& successors]
   (make-watch
     (fn [_ state _]
-      (def {:entries entries} state)
       (producer
-        (default peer group)
-        (def [_ _ [ecmd eflags]] (entries peer))
-        (default cmd ecmd)
-        (default flags eflags)
-        (let [proc (peer/pipe-out state peer cmd flags)]
-          (put peer/running group proc)
-          (produce (^peer/save-spawned group :boot))
-          (forever
-            (match (protect (aether/read-message (proc :out)))
-              [true {:op :ready}]
-              (produce (^peer/connect group (^peer/save-spawned group :mycelium)))
-              [true {:op :spawn :peer target :arg arg}]
-              (let [source (((state :nav/symbiont) group) (state :config))
-                    allowed @[;(keys (get source :spaces {}))
-                              (source :guarded-by)]]
-                (assert (and (keyword? target) (string? arg) (index-of target allowed))
-                        (. "Aether spawn from " group " is not permitted."))
-                (if-not (get-in state [:view :spawned target])
-                  (let [[_ _ [next-cmd next-flags]] (entries target)]
-                    (produce (^peer/run target target [;next-cmd arg] next-flags)))))
-              # A place is reported free by whoever let it go, and the
-              # report arrives after the closing, so the guardian asked to
-              # take it back can never arrive at a door still held. Only
-              # the holder may report its own place free.
-              [true {:op :left :place place}]
-              (do
-                (assert (and (keyword? place)
-                             (index-of place (peer/places state group)))
-                        (. "Aether left from " group " is not permitted."))
-                (produce (log group " reports " place " free")
-                         (^place/return place)))
-              [true {:op :result}]
-              (produce (log "Aether result from " group))
-              [true {:op op}]
-              (produce (log "Aether operation " op " from " group " is reserved."))
-              [false err]
-              (do
-                # A peer's Aether ends when the peer does, which is the
-                # ordinary close of an ordinary life. Only an Aether that
-                # stops mid-word has something to report.
-                (unless (string/has-prefix? "Aether stream ended" err)
-                  (produce (log "Aether from " group " closed: " err)))
-                (break))))
-          (def exit-code (os/proc-wait proc))
-          (put peer/running group nil)
-          (produce
-            (if (zero? exit-code)
-              (log (or peer group) " exited with success")
-              (log (or peer group) " exited with code " exit-code))
-            (^peer/remove group)
-            (^place/return group)))))
-    # `peer` defaults to `group` inside the producer, which is too late to
-    # name the event by: almost every caller passes only a group, and every
-    # one of those was reading back as "run peer " with nothing after it.
-    (. "run peer " (or peer group))))
+        (ev/with-deadline (+ peer/patience 5)
+          (while (present? (get-in state [:view :spawned]))
+            (ev/sleep 0.025)))
+        (produce ;successors)))
+    "wait for peer exits"))
 
 (define-event RunPeers
   "Runs peers event"
@@ -387,23 +390,25 @@
   3)
 
 (defn ^peer/ping
-  ```
-  Pings one peer and updates its missed heartbeat count.
-
-  Bounded, so that a peer which is alive but no longer answering becomes a
-  miss like any other instead of a park that takes the heartbeat with it.
-  ```
+  "Pings outside the manager; stale generations cannot inherit its result."
   [peer]
   (make-watch
     (fn [_ state _]
-      (try
-        (match (ev/with-deadline ping/patience (:ping (state peer)))
-          :pong
-          [(^peer/clear peer) (^peer/no-active peer)]
-          [:last-active (dt (epoch? dt))]
-          [(^peer/active peer dt) (^peer/clear peer)]
-          [(^peer/mark peer)])
-        ([e] [(^peer/mark peer)])))
+      (def generation ((lifecycle/record state peer) :generation))
+      (def client (state peer))
+      (producer
+        (def [ok answer] (protect (ev/with-deadline ping/patience (:ping client))))
+        (produce
+          (make-update
+            (fn [_ state]
+              (when (and (lifecycle/current? state peer generation)
+                         (= :mycelium (get-in state [:view :spawned peer])))
+                (def {:view {:misses misses :activity activity}} state)
+                (match [ok answer]
+                  [true :pong] (do (put misses peer 0) (put activity peer nil))
+                  [true [:last-active (dt (epoch? dt))]]
+                  (do (put misses peer 0) (put activity peer dt))
+                   (put misses peer (inc (get misses peer 0))))))))))
     (. "ping peer " peer)))
 
 (define-watch PingPeers
@@ -414,49 +419,40 @@
     (^peer/ping peer)))
 
 (define-watch CheckPeers
-  ```
-  Restarts peers that missed three consecutive heartbeats, stops reached
-  peers that have gone quieter than the thicket's patience, and raises
-  again any peer the thicket wants standing that is no longer there.
-
-  The last is not a nicety. A peer that dies is taken out of `:spawned`,
-  and `PingPeers` only pings what is in it, so nothing else here would
-  ever look for it again: a guardian that fell over would stay fallen,
-  and every door it was holding would stay shut. Peers raised on demand
-  are not autostarted and so are not missed -- being absent is their
-  ordinary condition.
-  ```
+  "Reconciles wanted peers, bounded startup and current-generation heartbeat state."
   [_ {:view view :timeout timeout :autostart autostart} _]
-  (def c @[])
-  (each [peer missed] (pairs (view :misses))
-    (when (and (= :mycelium ((view :spawned) peer)) (> missed 2))
-      (array/push c [(^peer/clear peer) (^peer/no-active peer)
-                     (^peer/stop peer) (^peer/run peer)])))
-  (each [peer active] (pairs (view :activity))
-    (when (and (= :mycelium ((view :spawned) peer))
-               (> (- (os/time) active) timeout))
-      (array/push c [(^peer/clear peer) (^peer/no-active peer)
-                     (^peer/stop peer)])))
-  (each peer (or autostart [])
-    (unless (get-in view [:spawned peer])
-      (array/push c [(log peer " is wanted standing and is not; raising it")
-                     (^peer/run peer)])))
-  (flatten c))
+  (def result @[])
+  (each [peer phase] (pairs (view :spawned))
+    (def entry (get-in view [:lifetimes peer] {}))
+    (cond
+      (and (= phase :boot) (entry :since) (> (- (os/clock) (entry :since)) 30))
+      (array/push result (^peer/restart peer))
+      (and (= phase :mycelium) (> (get-in view [:misses peer] 0) 2))
+      (array/push result (^peer/restart peer))
+      (and (= phase :mycelium) (get-in view [:activity peer])
+           (> (- (os/time) (get-in view [:activity peer])) timeout))
+      (array/push result (^peer/stop peer))))
+  (def wanted (tabseq [peer :in (if (view :ran) (or autostart []) [])] peer true))
+  (each [peer entry] (pairs (get view :lifetimes {}))
+    (put wanted peer (= :running (entry :desired))))
+  (each [peer desired] (pairs wanted)
+    (when (and desired (not (get-in view [:spawned peer]))
+               (>= (os/clock) (get-in view [:lifetimes peer :retry-at] 0)))
+      (array/push result (^peer/run peer))))
+  result)
 
 (defn ^peer/deploy
   "Deploys one peer and records the build revision beside its release executable."
   [peer]
   (make-event
-    {:watch (log "Deployed peer " peer)
-     :effect
+    {:effect
      (fn [_ {:build-path bp :release-path rp} _]
        (def pf (peer/file-name peer))
        (def bexep (executable (path/join bp "_build/develop" pf)))
        (def exep (executable (path/join rp pf)))
-       (sh/copy-file bexep exep)
-       (spit (peer/release-sha-file rp peer)
-             (slurp (peer/build-sha-file bp peer)))
-       (os/chmod (path/abspath exep) 8r700))}))
+       (artifact/install bexep exep)
+       (atomic/write (peer/release-sha-file rp peer)
+                     (slurp (peer/build-sha-file bp peer))))}))
 
 (defn ^peer/deploy-one
   "Deploys one configured peer whose built revision matches the checked-out source."
@@ -478,23 +474,25 @@
                      (string ($<_ git rev-parse HEAD)))
                   (. "Cannot deploy " peer
                      "; its build SHA does not match the checked-out source."))
+          (def metadata (artifact/read-installed artifact))
+          (assert (= :verified (metadata :status)) "Build provenance does not match its executable")
+          (assert (= (get-in metadata [:source :digest])
+                     (get (artifact/source bp) :digest))
+                  "Source contents changed after this build; rebuild before deployment")
+          (assert (deep= (metadata :dependencies)
+                         {:gp (artifact/dependency "gp/events")
+                          :twm (artifact/dependency "twm/app")})
+                  "Installed dependencies changed after this build; rebuild before deployment")
+          (assert (= (metadata :configuration)
+                     (artifact/fingerprint (((state :nav/symbiont) peer) (state :config))))
+                  "Configuration changed after this build; rebuild before deployment")
           (^peer/deploy peer))))
     (. "deploy peer " peer)))
-
-(defn ^peer/release-one
-  "Deploys one configured peer and restarts it only when it was already running."
-  [peer]
-  (make-watch
-    (fn [_ {:view {:spawned spawned}} _]
-      (if (spawned peer)
-        [(^peer/deploy-one peer) (^peer/stop peer) (^peer/run peer)]
-        [(^peer/deploy-one peer)]))
-    (. "release peer " peer)))
 
 (define-watch Deploy
   "Deploys peers"
   [_ {:entries entries} _]
-  (seq [peer :keys entries] (^peer/deploy peer)))
+  (seq [peer :keys entries] (^peer/deploy-one peer)))
 
 (defn ^peer/build
   "Builds one `peer`"
@@ -504,6 +502,14 @@
       (def {:entries entries :name name} state)
       (def [e exep _] (entries peer))
       (def rules @{})
+      (def conf (((state :nav/symbiont) peer) (state :config)))
+      (def provenance (artifact/provenance (state :build-path) conf))
+      (def built (executable (path/join (state :build-path) "_build/develop" (peer/file-name peer))))
+      # Spork's entry-file timestamp alone cannot see imported code or native
+      # dependency changes. Invalidate only this target's generated outputs.
+      (each file [built (string built ".c") (string built ".provenance.jdn")
+                  (peer/build-sha-file (state :build-path) peer)]
+        (when (os/stat file) (os/rm file)))
       (def old-conf (os/getenv "CONF"))
       (defer (os/setenv "CONF" old-conf)
         (with-dyns [*rules* rules
@@ -512,8 +518,11 @@
           (declare-project :name (. name "-" peer))
           (declare-executable :entry e :name (. (peer/file-name peer)))
           (build-run rules "build")
-          (spit (peer/build-sha-file (state :build-path) peer)
-                (string ($<_ git rev-parse HEAD))))))))
+          (assert (deep= provenance (artifact/provenance (state :build-path) conf))
+                  "Build inputs changed during compilation; artifact is not deployable")
+          (artifact/record built provenance)
+          (atomic/write (peer/build-sha-file (state :build-path) peer)
+                        (get-in provenance [:source :revision])))))))
 
 (defn ^peer/build-one
   "Builds one explicitly configured peer, without deploying or restarting it."
@@ -543,19 +552,100 @@
   [_ {:build-path bp} _]
   (rm (path/join bp "_build")))
 
-(defn ^release
-  "Event that releases the new version of the thicket."
-  [now]
+(defn peers/await-exit
+  "Waits for confirmed reaping, not for a stop request to have been accepted."
+  [state &opt peer]
+  (ev/with-deadline (+ peer/patience 5)
+    (while (if peer (get-in state [:view :spawned peer])
+             (present? (get-in state [:view :spawned])))
+      (ev/sleep 0.025))))
+
+(defn peers/await-ready
+  "Completes only when all requested peers have announced and answered readiness."
+  [state peers &opt even-when-dry]
+  (when (or even-when-dry (not (state :dry)))
+    (ev/with-deadline 45
+      (while (some |(not= :mycelium (get-in state [:view :spawned $])) peers)
+        (ev/sleep 0.025)))))
+
+(defn peer/maintain
+  "Performs one peer operation, with applied steps and a real replacement barrier."
+  [state record kind peer]
+  (case kind
+    :peer/build (operation/step record :building [(^peer/build-one peer)])
+    :peer/deploy (operation/step record :installing [(^peer/deploy-one peer)])
+    :peer/release
+    (do
+      (operation/step record :installing [(^peer/deploy-one peer)])
+      (when (get-in state [:view :spawned peer])
+        (operation/step record :stopping [(^mark-release (os/time)) (^peer/restart peer)])
+        (peers/await-exit state peer)
+        (operation/step record :starting [(^peer/run peer)])
+        (peers/await-ready state [peer])))))
+
+(defn ^peer/release-one
+  "Runs a selective release with observable failure and completed replacement."
+  [peer]
   (make-watch
-    (fn [_ {:dry dry :builder builder :view {:ran ran}} _]
-      [(^mark-release now)
-       ;[;(if (or (not builder) dry)
-            [(log "Build dry run") StopPeers]
-            [CleanBuild Build StopPeers Deploy])
-         SetReleasedSHA Released Ready
-         (if ran RunPeers Empty)]
-       (log "Release finished")])
-    "release"))
+    (producer (operation/submit :peer/release |(peer/maintain $0 $1 :peer/release peer)))
+    (. "release peer " peer)))
+
+(defn ^peer/command
+  "CLI maintenance uses the same receipts and returns a failing process exit on failure."
+  [kind peer]
+  (make-watch
+    (fn [_ state _]
+      (producer
+        (def accepted (operation/submit kind |(peer/maintain $0 $1 kind peer)))
+        (var receipt nil)
+        (ev/with-deadline 3600
+          (while (do (set receipt (operation/status (state :view) (accepted :id)))
+                     (index-of (receipt :status) [:accepted :running]))
+            (ev/sleep 0.025)))
+        (pp receipt)
+        (unless (= :completed (receipt :status)) (os/exit 1))))
+    "peer maintenance command"))
+
+(defn maintain
+  "Performs thicket maintenance without advancing past a failed or unfinished step."
+  [state record kind]
+  (def ran (get-in state [:view :ran]))
+  (case kind
+    :pull
+    (do
+      (unless (state :dry) ($< git pull))
+      (operation/step record :source [(^save-sha (string ($<_ git rev-parse HEAD)))]))
+    :run-peers
+    (do (operation/step record :starting [RunPeers])
+        (peers/await-ready state (state :autostart)))
+    :stop-peers
+    (do (operation/step record :stopping [StopPeers]) (peers/await-exit state))
+    :restart-peers
+    (do (operation/step record :stopping [StopPeers])
+        (peers/await-exit state)
+        (operation/step record :starting [RunPeers])
+        (peers/await-ready state (state :autostart)))
+    :release
+    (do
+      (operation/step record :preparing [(^mark-release (os/time))
+                                        (^save-sha (string ($<_ git rev-parse HEAD)))])
+      (when (and (state :builder) (not (state :dry)))
+        (operation/step record :building [Build]))
+      (operation/step record :stopping [StopPeers])
+      (peers/await-exit state)
+      (when (and (state :builder) (not (state :dry)))
+        (operation/step record :installing [Deploy]))
+      (operation/step record :recording [SetReleasedSHA])
+      (when ran
+        (operation/step record :starting [RunPeers])
+        (peers/await-ready state (state :autostart)))
+      (operation/step record :ready [Ready]))
+    (error (string "Unknown maintenance operation " kind))))
+
+(defn ^release
+  "Accepts an observable release, retaining compatibility with event callers."
+  [_now]
+  (make-watch (producer (operation/submit :release |(maintain $0 $1 :release))) "release"))
 
 (define-event PrepareView
   "Prepares view"
@@ -574,7 +664,7 @@
        (tabseq [[n e] :pairs entries]
          (keyword n) (transformer n e)))
      (merge-into state
-                 {:view @{:spawned @{} :misses @{} :activity @{}}
+                 {:view @{:spawned @{} :misses @{} :activity @{} :lifetimes @{}}
                   :entries tentries}))
    :effect (fn [_ {:view view :build-path bp} _]
              (os/cd bp)
@@ -585,8 +675,8 @@
   [handler]
   (fn [& args]
     (define :view)
-    (if-let [from (view :releasing)]
-      [:busy from (view :sha)]
+    (if-let [id (view :operation)]
+      {:status :busy :id id}
       (handler ;args))))
 
 (defr -:state
@@ -606,47 +696,54 @@
       [:bootstrapped])))
 
 (defr -:versions
-  "RPC function, that code versions "
+  "Reports source, installed and active identities separately for every peer."
   []
-  [:versions (view :sha) (view :release-sha)])
+  (var state nil)
+  (produce/applied [(make-effect (fn [_ s _] (set state s)))])
+  {:source (artifact/source (state :build-path))
+   :peers (tabseq [peer :keys (state :entries)]
+            peer {:installed (artifact/read-installed
+                               (executable (path/join (state :release-path) (peer/file-name peer))))
+                  :active (when (get-in state [:view :spawned peer])
+                            (get-in state [:view :lifetimes peer :active]))
+                  :lifecycle (freeze (select-keys (get-in state [:view :lifetimes peer] {})
+                                      [:generation :phase :desired :since :ready-at
+                                       :failures :exit-code :failure :retry-at]))})})
+
+(defr -:operation
+  "Returns the latest receipt for an accepted operation ID."
+  []
+  (operation/status view (first args)))
 
 (defr +:release
   "RPC function, that starts the release if possible."
   [guard-releasing]
-  (let [now (os/clock)]
-    (produce (^release now))
-    [:ok now]))
+  (operation/submit :release |(maintain $0 $1 :release)))
 
 (defr +:stop-peers
   "RPC function, that stops the peers if possible."
   [guard-releasing]
-  (if (view :ran)
-    (do (produce StopPeers) :ok)
-    :not-running))
+  (operation/submit :stop-peers |(maintain $0 $1 :stop-peers)))
 
 (defr +:run-peers
   "RPC function, that starts the peers if possible."
   [guard-releasing]
-  (if-let [ran (view :ran)]
-    [:running ran]
-    (do
-      (produce RunPeers)
-      :ok)))
+  (operation/submit :run-peers |(maintain $0 $1 :run-peers)))
 
 (defr +:restart-peers
   "RPC function, that starts the peers if possible."
-  [produce-resp ok-resp guard-releasing]
-  [StopPeers RunPeers])
+  [guard-releasing]
+  (operation/submit :restart-peers |(maintain $0 $1 :restart-peers)))
 
 (defr +:stop
   "RPC function that stops the demiurge."
   [produce-resp ok-resp guard-releasing]
-  [(^delay 0.001 Stop)])
+  [StopPeers (^peers/after-exit Stop)])
 
 (defr +:pull
   "RPC function that stops the demiurge."
-  [produce-resp ok-resp guard-releasing]
-  [PullGetSHA])
+  [guard-releasing]
+  (operation/submit :pull |(maintain $0 $1 :pull)))
 
 (def rpc-funcs
   "RPC functions"
@@ -657,6 +754,7 @@
     :restart-peers +:restart-peers
     :pull +:pull
     :versions -:versions
+    :operation -:operation
     :stop +:stop})
 
 (defn ^bootstrap-arg
@@ -669,8 +767,8 @@
   "Heart beat checker function"
   (heart-beat
     [PingPeers CheckPeers]
-    (fn :ping [i {:view {:spawned spawned :releasing releasing}}]
-      (and (not releasing) (present? spawned) (= 0 (mod i 2))))))
+    (fn :ping [i {:dry dry :view {:releasing releasing}}]
+      (and (not dry) (not releasing) (= 0 (mod i 2))))))
 
 (define-update ClearTests
   "Clears the test stats"
@@ -733,7 +831,7 @@
   "Runs test files once and publishes their result over the Aether."
   [scope & files]
   (make-watch
-    (fn [&]
+    (fn [_ state _]
       (producer
         (def done (ev/chan))
         (def failing @[])
@@ -743,8 +841,8 @@
         (loop [f :in files
                :let [path (string "test/" f)]
                :when (string/has-suffix? ".janet" path)]
-          (produce ClearData (^peer/run :tree) (^peer/connect :tree))
-          (ev/sleep 0.2)
+          (produce/applied [ClearData (^peer/run :tree)])
+          (peers/await-ready state [:tree] true)
           (produce (logr "\n----- In file " path " -----") (^test/file path done))
           (def [_ pass] (ev/take done))
           (produce (^inc :total) (if pass (^inc :passed) (^failed path)))
@@ -767,10 +865,10 @@
           # `^peer/insist` ends a peer that outstays `peer/patience`, and
           # giving up says so rather than hanging the whole run.
           (var waited 0)
-          (while (and (peer/running :tree) (< waited (+ peer/patience 2)))
+          (while (and (get-in state [:view :spawned :tree]) (< waited (+ peer/patience 2)))
             (ev/sleep 0.05)
             (+= waited 0.05))
-          (when (peer/running :tree)
+          (when (get-in state [:view :spawned :tree])
             (produce
               (logr "  the tree outstayed its stop; " path
                     " leaves its data to the next file"))))

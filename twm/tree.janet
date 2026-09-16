@@ -1,5 +1,6 @@
 (import ./thicket :prefix "")
 (import ./sentry :as sentry)
+(import gp/ownership)
 
 (defn ^peer/restore
   "Restores the RPC URL for a connected peer."
@@ -109,10 +110,14 @@
   the setup is what creates.
   ```
   [config & setup]
-  (-> config
-      (make-manager on-error)
-      (:transact ;setup Settling (^rpc/start AetherReady))
-      :await))
+  # Acquire before PrepareStore can load or flush. Keep the non-marshallable
+  # kernel handle outside manager state; a killed process releases it too.
+  (def claim (ownership/acquire (string (path/abspath (config :image)) ".lock")))
+  (defer (ownership/release claim)
+    (-> config
+        (make-manager on-error)
+        (:transact ;setup Settling (^rpc/start AetherReady))
+        :await)))
 
 (defmacro main
   "Defines a Tree executable entry point around `run`."

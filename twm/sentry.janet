@@ -3,70 +3,39 @@
 (setdyn *handler-defines* [:view :conn])
 (defdyn *view* "View for handlers")
 
-(defn ^session/new
-  "Saves new session on the tree"
+(defn session/publish
+  "Publishes a session from outside the manager, requiring an applied Tree receipt."
   [session]
-  (if session
-    (make-effect
-      (fn [_ {:tree tree :tenant tenant :name name} _]
-        (default tenant name)
-        (produce (diag "session-new name=" name " tenant=" tenant
-                       " present=" (present-string? session)
-                       " length=" (length session)))
-        (:session/new tree tenant session))
-      "new session")
-    Empty))
+  (def context @{})
+  (produce/applied
+    [(make-update
+       (fn [_ state]
+         (merge-into context {:tree (state :tree)
+                              :tenant (or (state :tenant) (state :name))})))])
+  (def receipt (rpc/call (context :tree) :session/new [(context :tenant) session]))
+  (assert (= :applied (get receipt :status)) "Tree did not acknowledge an applied session")
+  receipt)
+
+(defn ^session/new
+  "Publishes a session asynchronously and runs successors only on applied success."
+  [session & after]
+  (make-watch
+    (producer
+      (session/publish session)
+      (when (present? after) (produce ;after)))
+    "publish session"))
 
 (defn session/settled?
-  ```
-  Whether the tree agrees `tenant`'s session is now `session`.
-
-  Asked by offering the tree's own capability the very session in
-  question: a capability only admits the session it was made from, so one
-  that admits this session was made after the change landed.
-  ```
+  "Checks exact session equality; an ended session is not an authentication capability."
   [tree tenant session]
-  (match (protect ((:cap/session tree tenant)
-                    {:headers {"Cookie" {"session" session}}}))
-    [true admitted] (truthy? admitted)
-    # A tree that will not answer has not agreed to anything.
+  (match (protect (rpc/call tree :session/matches [tenant session] true))
+    [true matches] (truthy? matches)
     false))
 
 (defn ^session/end
-  ```
-  Ends `tenant`'s session, waits until the tree agrees it has ended, and
-  only then produces `after`.
-
-  The waiting is the whole of it. `:session/new` is answered before it is
-  applied -- the tree's handler produces its events and the reply goes
-  back while they are still to be transacted -- so anything that acted on
-  the ending in that gap read the session that was. A symbiont that
-  reported its place free straight afterwards had its guardian take the
-  door back and read the old capability as it went, and the door opened
-  again to the cookie just logged out.
-
-  It is asked before any waiting, so an ending that has already landed
-  costs nothing, and it gives up after a second rather than hold a door
-  open on a tree that has stopped answering.
-  ```
+  "Ends a session and proceeds only after Tree confirms application."
   [& after]
-  (make-watch
-    (fn [_ state _]
-      (producer
-        (def {:tree tree :name name} state)
-        (def tenant (or (state :tenant) name))
-        (produce (log "session-end-begin name=" name " tenant=" tenant))
-        (protect (:session/new tree tenant ""))
-        (var settled (session/settled? tree tenant ""))
-        (var tries 0)
-        (while (and (not settled) (< tries 50))
-          (ev/sleep 0.02)
-          (++ tries)
-          (set settled (session/settled? tree tenant "")))
-        (produce (log "session-end-poll-finished name=" name " tenant=" tenant
-                       " settled=" settled " tries=" tries))
-        (if (present? after) (produce ;after))))
-    "end session"))
+  (apply ^session/new "" (or after [])))
 
 (defn- guarded/surface
   ```
@@ -172,8 +141,7 @@
   (make-watch
     (fn [_ state _]
       (if-let [space (place/of state place)]
-        [(^tenant/refresh-view :cap/session)
-         (^space/resume space)]))
+        [(projection/^refresh [:cap/session] (^space/resume space))]))
     (. "resume " place)))
 
 (def- rpc/guardian
@@ -285,7 +253,7 @@
   (http/stream-with
     (merge <handover/>
            (http/cookie "session" "; Max-Age=0; Path=/;"))
-    (ev/take done)
+    (ev/with-deadline 10 (ev/take done))
     (eprin (string (view :name) " logout/response-ready\n"))
     (:write (dyn :sse-conn) transition)
     (protect (:flush (dyn :sse-conn)))
@@ -297,7 +265,7 @@
   [sent]
   (make-watch
     (producer
-      (ev/take sent)
+      (protect (ev/with-deadline 10 (ev/take sent)))
       (produce StandDown))
     "stand down after logout"))
 
@@ -329,11 +297,10 @@
       # asking rather than by being told: the tree's push reaches whoever
       # it can dial, and a guardian it cannot dial would go on admitting
       # the session it was holding.
-      (^session/end (^tenant/refresh-view :cap/session) settled)
+      (^session/end settled)
       # Signal the response before standing down: StandDown exits this
       # manager after closing the dashboard's address.
-      (^session/end (^tenant/refresh-view :cap/session)
-                    settled
+      (^session/end settled
                     (logout/standdown-after sent))))
   (logout/response view done sent))
 
@@ -507,13 +474,9 @@
 
   The order is the whole of it. The document has to be on the wire before
   the listener closes, because closing wakes the accepting fiber and can
-  take the response with it; and the stream has to end after, because the
-  beat only starts counting once the browser sees the stream finish.
-
-  What the beat is counting is this handover: by the time it reopens
-  `/content`, the door is meant to be answered by whoever is rising into
-  it. Nothing here waits for that to be true -- the beat is a constant,
-  and a boot slower than it will be met by a door still changing hands.
+  take the response with it. The browser then polls the incoming role's
+  readiness endpoint before requesting content or navigating. It does
+  not infer readiness from the elapsed time since this response.
   ```
   [view guards transition]
   (:write (dyn :sse-conn) transition)
@@ -682,11 +645,11 @@
     (let [sk (derive-from key)]
       (produce (diag "auth-success name=" (view :name)
                      " guards=" guards " session-length=" (length sk)))
+      (session/publish sk)
       (http/stream-with
         (merge <handover/>
                (http/cookie "session"
                             (string sk "; Secure; HttpOnly; Path=/;")))
-        (produce (^session/new sk))
         (handover/transition view guards transition)))
     (do
       (produce (diag "auth-failure name=" (view :name)))

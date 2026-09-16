@@ -17,7 +17,7 @@
   [&named spawned misses activity autostart timeout]
   @{:timeout (or timeout 60)
     :autostart (or autostart [])
-    :view @{:spawned (or spawned @{})
+    :view @{:ran true :spawned (or spawned @{})
             :misses (or misses @{})
             :activity (or activity @{})}})
 
@@ -49,13 +49,13 @@
 # raise it again.
 (let [d (decisions CheckPeers
                    (thicket :spawned @{:pepe :mycelium} :misses @{:pepe 3}))]
-  (assert (index-of "stop peer pepe" d) "a peer that missed three pings is stopped")
-  (assert (index-of "run peer pepe" d) "a peer that missed three pings is raised again"))
+  (assert (index-of "restart peer pepe" d) "a peer that missed three pings is stopped")
+  (assert (index-of "restart peer pepe" d) "a peer that missed three pings is replaced"))
 
 # Two is not yet three.
 (let [d (decisions CheckPeers
                    (thicket :spawned @{:pepe :mycelium} :misses @{:pepe 2}))]
-  (assert (not (index-of "stop peer pepe" d)) "two missed pings is not enough to stop")
+  (assert (not (index-of "restart peer pepe" d)) "two missed pings is not enough to stop")
   (assert (not (index-of "run peer pepe" d)) "two missed pings is not enough to raise"))
 
 # Going quiet past the thicket's patience is a peer with nothing to do. It
@@ -70,7 +70,7 @@
 (let [d (decisions CheckPeers
                    (thicket :spawned @{:pepe :mycelium}
                             :activity @{:pepe (os/time)}))]
-  (assert (not (index-of "stop peer pepe" d)) "a peer active just now is left alone"))
+  (assert (not (index-of "restart peer pepe" d)) "a peer active just now is left alone"))
 (end-suite)
 
 (start-suite :checking-booting-peers)
@@ -81,7 +81,7 @@
                    (thicket :spawned @{:pepe :boot}
                             :misses @{:pepe 3}
                             :activity @{:pepe (long-ago)}))]
-  (assert (not (index-of "stop peer pepe" d)) "a booting peer is not stopped")
+  (assert (not (index-of "restart peer pepe" d)) "a booting peer is not stopped")
   (assert (not (index-of "run peer pepe" d)) "a booting peer is not raised again"))
 
 # Nor is a booting peer wanted standing raised a second time: it is already
@@ -122,7 +122,7 @@
                      :misses @{:pepe 3}
                      :activity @{:pepe (long-ago)})
       manager (make-manager state)]
-  (assert (index-of "stop peer pepe" (decisions CheckPeers state))
+  (assert (index-of "restart peer pepe" (decisions CheckPeers state))
           "the unreachable peer is stopped")
   # ^peer/stop's own watch removes it; ^peer/run saves the replacement as
   # :boot. Both are done here directly, because transacting them would
