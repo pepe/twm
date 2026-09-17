@@ -35,6 +35,26 @@
   (assert (not (peer/buildable? state :cmc))))
 (end-suite)
 
+(start-suite :test-subprocess-results)
+(let [file (path/join (or (os/getenv "TEMP") "/tmp")
+                      (string "twm-test-child-" (os/getpid) ".janet"))
+      state @{:test @{:total 0 :passed 0 :failing @[]}}
+      manager (make-manager state)]
+  (defer (os/rm file)
+    (spit file "(print \"child stdout\") (eprint \"child stderr\") (os/exit 0)")
+    (:transact manager (^test/file file))
+    (:await manager)
+    (assert (= 1 (get-in state [:test :total])))
+    (assert (= 1 (get-in state [:test :passed]))
+            "redirected test subprocess can write to stdout and stderr")
+    (spit file "(os/exit 7)")
+    (:transact manager (^test/file file))
+    (:await manager)
+    (assert (= 2 (get-in state [:test :total])))
+    (assert (deep= @[file] (get-in state [:test :failing]))
+            "nonzero subprocess exit remains a test failure")))
+(end-suite)
+
 (start-suite :peer-removal)
 # A peer is removed when its process exits. Heartbeat state names a peer,
 # not a process, so anything left behind is inherited by its replacement.

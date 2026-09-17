@@ -1,6 +1,24 @@
 (use spork/test)
 (import ../twm/thicket :prefix "")
 
+(start-suite :announced-capability-readiness)
+(let [own @{} one @{} two @{}
+      state @{:name :guardian :view own
+              :spaces {:one {:view one} :two {:view two}}}
+      manager (make-manager state)
+      cap (fn [&] true)]
+  (:transact manager (^session/cap cap))
+  (each view [own one two]
+    (assert (not (get (readiness/status view) :ready))
+            "capability alone does not finish a full projection"))
+  (:transact manager (^session/cap cap true))
+  (:await manager)
+  (each view [own one two]
+    (assert (get (readiness/status view) :ready)
+            "announced guardian readiness reaches every inhabited space")
+    (assert (= cap (view :cap/session)))))
+(end-suite)
+
 # Giving up a peer is two things, and the order is the whole of it: the
 # goodbye is said over the very connection the close then takes away. What
 # went wrong before was not that the goodbye was said badly but that it was

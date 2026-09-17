@@ -174,7 +174,7 @@
        (each place [state ;(values (get state :spaces {}))]
          (if-let [view (place :view)]
            (put view :cap/session cap))))
-     :watch (if announce AetherReady)}
+     :watch (if announce [(projection/^ready) AetherReady])}
     "save session"))
 
 (def register/at

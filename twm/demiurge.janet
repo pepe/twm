@@ -806,7 +806,9 @@
     (fn [&]
       (def pass
         (zero? (os/execute [(dyn *executable* "janet") "--" path]
-                           :p {:out stderr})))
+                           # Keep both descriptors explicit when stdout is
+                           # redirected to stderr (including on POSIX Janet).
+                           :p {:out stderr :err stderr})))
       (if done
         (ev/give done [path pass])
         [(^inc :total) (if pass (^inc :passed) (^failed path))]))))
