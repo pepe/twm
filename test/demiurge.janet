@@ -23,6 +23,18 @@
 
 (defn long-ago [] (- (os/time) 600))
 
+(start-suite :fleet-excludes-handles)
+# :entries also contains dmc/cmc for explicit handle builds. They are not
+# symbionts and cannot use peer configuration or peer deployment.
+(let [state @{:builds [:tree :pepe]
+              :entries {:tree "tree.janet" :pepe "dashboard.janet"
+                        :dmc "dmc.janet" :cmc "cmc.janet"}}]
+  (assert (deep= @["build peer tree" "build peer pepe"] (decisions Build state)))
+  (assert (deep= @["deploy peer tree" "deploy peer pepe"] (decisions Deploy state)))
+  (assert (not (peer/buildable? state :dmc)))
+  (assert (not (peer/buildable? state :cmc))))
+(end-suite)
+
 (start-suite :peer-removal)
 # A peer is removed when its process exits. Heartbeat state names a peer,
 # not a process, so anything left behind is inherited by its replacement.

@@ -490,9 +490,9 @@
     (. "deploy peer " peer)))
 
 (define-watch Deploy
-  "Deploys peers"
-  [_ {:entries entries} _]
-  (seq [peer :keys entries] (^peer/deploy-one peer)))
+  "Deploys the declared peer fleet; CLI handles have a separate build path."
+  [_ {:builds builds} _]
+  (seq [peer :in builds] (^peer/deploy-one peer)))
 
 (defn ^peer/build
   "Builds one `peer`"
@@ -522,7 +522,8 @@
                   "Build inputs changed during compilation; artifact is not deployable")
           (artifact/record built provenance)
           (atomic/write (peer/build-sha-file (state :build-path) peer)
-                        (get-in provenance [:source :revision])))))))
+                        (get-in provenance [:source :revision])))))
+    (. "build peer " peer)))
 
 (defn ^peer/build-one
   "Builds one explicitly configured peer, without deploying or restarting it."
@@ -536,9 +537,9 @@
     (. "build peer " peer)))
 
 (define-watch Build
-  "Builds peers"
-  [_ {:entries entries} _]
-  (seq [p :keys entries] (^peer/build p)))
+  "Builds the declared peer fleet, excluding CLI handles in :entries."
+  [_ {:builds builds} _]
+  (seq [p :in builds] (^peer/build p)))
 
 (defn ^mark-release
   "Marks that release has started"
@@ -701,7 +702,7 @@
   (var state nil)
   (produce/applied [(make-effect (fn [_ s _] (set state s)))])
   {:source (artifact/source (state :build-path))
-   :peers (tabseq [peer :keys (state :entries)]
+   :peers (tabseq [peer :in (state :builds)]
             peer {:installed (artifact/read-installed
                                (executable (path/join (state :release-path) (peer/file-name peer))))
                   :active (when (get-in state [:view :spawned peer])
