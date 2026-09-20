@@ -411,11 +411,16 @@ dynamics as set by *rpc-defines*.```
   (assert http "HTTP host and port must be set, exiting.")
   (assert (table? routes) "Routes must be table, exiting.")
   (if static (assert public "Public path must be set, exiting."))
+  # The view is read when the request arrives, not when the server is built.
+  # A symbiont's own space is its state, and a symbiont that installs its
+  # view after standing its server up would otherwise answer about the
+  # nothing it had at that moment for as long as it lived.
   (def routes (merge routes
                      {"/_ready" (fn [_]
-                                 (http/success (json/encode (readiness/status view))
-                                               {"Content-Type" "application/json"
-                                                "Cache-Control" "no-store"}))}))
+                                 (http/success
+                                   (json/encode (readiness/status (space :view)))
+                                   {"Content-Type" "application/json"
+                                    "Cache-Control" "no-store"}))}))
   (def parser
     (http/parser
       (cond-> routes

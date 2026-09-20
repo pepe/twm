@@ -12,9 +12,17 @@
 (defn status
   "Returns a small public readiness description, without session information."
   [view]
-  (def g (gate view))
-  {:ready (= :ready (g :status)) :status (g :status)
-   :generation (g :generation) :role (if (view :guards) "guardian" "symbiont")})
+  # A place whose symbiont has not installed its view yet has no gate to
+  # describe and nothing to be ready with. It is asked all the same: this is
+  # what a browser polls while it waits to be let through a handover, and a
+  # raise here was answered with a 500, which the waiter reads as a refusal
+  # and keeps asking about for the whole half minute it is willing to wait.
+  (if (nil? view)
+    {:ready false :status :pending :role "symbiont"}
+    (let [g (gate view)]
+      {:ready (= :ready (g :status)) :status (g :status)
+       :generation (g :generation)
+       :role (if (view :guards) "guardian" "symbiont")})))
 
 (defn settle
   "Completes a readiness gate and wakes all waiters, without waiting for them."

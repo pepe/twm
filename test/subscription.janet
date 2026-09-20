@@ -34,4 +34,9 @@
 (assert-error "cold wait is bounded" (readiness/await timed 0.01))
 (readiness/settle timed :ready)
 (assert (readiness/await timed) "cancelled waiter cannot block subsequent readiness")
+# The endpoint is asked before a symbiont has installed its view, and an
+# answer of "not yet" is the truth; raising there is read as a refusal.
+(def absent (readiness/status nil))
+(assert (not (absent :ready)) "a place without a view is not ready")
+(assert (= :pending (absent :status)) "and says so rather than raising")
 (end-suite)
