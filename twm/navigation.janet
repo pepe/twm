@@ -21,12 +21,9 @@
   (let [c @[]
         t @{}
         =>membrane (=> :membrane :nodes symbiont)
-        =>neighbors (=> =>membrane :neighbors)
-        =>entrance (=> :membrane :nodes values
-                       (>find-from-start (??? {:entrance true?})))]
+        =>neighbors (=> =>membrane :neighbors)]
     (=>
       (<:- t :build-path (=> :deploy :build-path))
-      (<:- t :entrance/address (=> =>entrance :address))
       (>if =>membrane
            (>if (=> =>membrane :rpc)
                 (<:= t (=> =>membrane :rpc |{:membrane/rpc $}))
