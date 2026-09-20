@@ -23,9 +23,6 @@
 (def?! config/caps
   {:caps (?optional (>?? all keyword?))})
 
-(def?! config/tenant
-  {:tenant (?optional peer?)})
-
 (def?! config/runtime
   {:debug boolean?
    :log boolean?
@@ -64,7 +61,6 @@
   config/entry?
   config/persisted?
   config/caps?
-  config/tenant?
   {:guarded-by (?optional peer?)
    :timeout (?optional number?)})
 
@@ -72,7 +68,6 @@
   dictionary?
   config/entry?
   config/caps?
-  config/tenant?
   {:secret (?optional present-string?)
    :key (?optional present-string?)})
 
@@ -122,6 +117,7 @@
   dictionary?
   {:http url?
    :address (?optional present-string?)
+   :entrance (?optional boolean?)
    :neighbors (?optional (>?? all peer?))
    :static (?optional boolean?)
    :public (?optional present-string?)}

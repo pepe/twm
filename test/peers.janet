@@ -43,17 +43,16 @@
 (let [record @[]
       state @{:name :pepe :peers [:tree] :tree (stub/client record)}]
   (:transact (make-manager state) ClosePeers)
-  (assert (deep= record @[[:deregister :pepe :pepe] [:close]])
+  (assert (deep= record @[[:deregister :pepe] [:close]])
           "a peer is deregistered before its connection is closed"))
 
-# A guardian registers for the tenant whose place it stands in, not under
-# its own name, so it must say goodbye under that same tenant.
+# A guardian registers under its own name, so its goodbye does too.
 (let [record @[]
       state @{:name :pepe/sentry :guards :pepe :peers [:tree]
               :tree (stub/client record)}]
   (:transact (make-manager state) ClosePeers)
-  (assert (deep= record @[[:deregister :pepe/sentry :pepe] [:close]])
-          "a guardian deregisters under the tenant it guards"))
+  (assert (deep= record @[[:deregister :pepe/sentry] [:close]])
+          "a guardian deregisters under its own name"))
 
 # Not every peer keeps registrations; one that offers no `:deregister` is
 # still closed.
@@ -72,7 +71,7 @@
       manager (make-manager state)]
   (:transact manager ClosePeers)
   (:transact manager ClosePeers)
-  (assert (deep= record @[[:deregister :pepe :pepe] [:close] [:close]])
+  (assert (deep= record @[[:deregister :pepe] [:close] [:close]])
           "a closed peer is not deregistered a second time"))
 
 # Every peer gets its turn, not merely the first.

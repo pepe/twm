@@ -16,9 +16,8 @@ birth as this repository.
   store lifecycle (`PrepareStore`, `SeedStore`), heart-beat, aether
   spawn/occupation, datastar helpers, test validators.
 - `twm/thicket` — the Mycelium fabric. Peer connection and registration,
-  session capability saving, view refresh scoped by whose slice of the
-  Tree it projects (`^tenant/refresh-view`, `^peer/refresh-view`),
-  mycelium navigations.
+  Thicket session capability saving, Tree projection refresh
+  (`^tree/refresh-view`), and mycelium navigations.
 - `twm/sentry` — the guardian. Shapes session Capabilities
   (`=>session/?eq`), gates requests on the bearer's cap (`check-session`,
   `session/check-with`), handles `/logout` (303), navigates sentry

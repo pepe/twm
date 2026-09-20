@@ -10,9 +10,8 @@
   (produce/applied
     [(make-update
        (fn [_ state]
-         (merge-into context {:tree (state :tree)
-                              :tenant (or (state :tenant) (state :name))})))])
-  (def receipt (rpc/call (context :tree) :session/new [(context :tenant) session]))
+         (put context :tree (state :tree))))])
+  (def receipt (rpc/call (context :tree) :session/new [session]))
   (assert (= :applied (get receipt :status)) "Tree did not acknowledge an applied session")
   receipt)
 
@@ -27,8 +26,8 @@
 
 (defn session/settled?
   "Checks exact session equality; an ended session is not an authentication capability."
-  [tree tenant session]
-  (match (protect (rpc/call tree :session/matches [tenant session] true))
+  [tree session]
+  (match (protect (rpc/call tree :session/matches [session] true))
     [true matches] (truthy? matches)
     false))
 
@@ -72,23 +71,18 @@
           (each guarded ((=>guardian/spaces sentry) config)
             (put spaces guarded
                  (merge (guarded/surface config guarded)
-                        @{:name guarded
-                          :guards guarded
-                          :tenant (or (get-in config [:symbionts guarded :tenant])
-                                      guarded)
-                          :rpc (get-in config
-                                       [:mycelium :nodes guarded :rpc])})))
+                         @{:name guarded
+                           :guards guarded
+                           :rpc (get-in config
+                                        [:mycelium :nodes guarded :rpc])})))
           config)
         (<:- t :spaces (fn [&] spaces))
         (fn [config]
-          # A guardian registers for one tenant, so the places it holds
-          # must belong to one. Guarding across tenants is a shape nobody
-          # has needed; it should be said out loud before it is allowed.
-          (def tenants (distinct (map |($ :tenant) (values spaces))))
-          (assert (>= 1 (length tenants))
-                  (string "Guardian " sentry " would stand in places of "
-                          (length tenants) " tenants, and registers for one."))
-          (if-let [tenant (first tenants)] (put t :tenant tenant))
+          (def entrances (filter |(get $ :entrance false) (values spaces)))
+          (when (not (empty? spaces))
+            (assert (= 1 (length entrances))
+                    (string "Guardian " sentry " must hold exactly one entrance, found "
+                            (length entrances) ".")))
           config)
         (>base t))))
 
@@ -128,7 +122,7 @@
 (defn ^place/resume
   ```
   Takes back the living space this symbiont holds for `place`, and asks
-  the tree what the tenant's session is before answering on it again.
+  the tree what the Thicket's session is before answering on it again.
 
   A guardian used to be born into a place it took back, and a newborn
   reads the session as it registers. One that outlives the handover has
@@ -389,14 +383,14 @@
   root-absolute `/content` asks the origin's *root* for it. Where a place
   is its own origin that is the place itself, which is why this was never
   wrong in development, where each door has a port. Where places share an
-  origin the root is the tenant's, so a guarded door served its Membrane
-  and the Membrane then opened the tenant's stage -- the cosymbiont
-  reached, and answered for by somebody else.
+  origin the root is the entrance's, so a secondary door served its
+  Membrane and the Membrane then opened the entrance's stage -- the
+  cosymbiont reached, and answered for by somebody else.
 
-  The tenant's own door is the only one carrying a form, a resume or a
-  logout, and its address is the origin's root wherever this arrangement
-  is used, so those were never wrong. They ask through here so that they
-  stay right if a tenant is ever put under a path of its own.
+  The entrance is the only door carrying a form, a resume or a logout,
+  and its address is the origin's root wherever this arrangement is used,
+  so those were never wrong. They ask through here so that they stay right
+  if the entrance is ever put under a path of its own.
 
   The `:address` already says which arrangement it is, and every symbiont
   already writes its URLs from its own. A guardian holds several, so it
@@ -483,22 +477,21 @@
   (protect (:flush (dyn :sse-conn)))
   (handover/after-response view guards))
 
-(defn place/held-for-another?
+(defn place/secondary?
   ```
-  Whether `place` is a door this guardian holds for a symbiont other than
-  the tenant.
+  Whether `place` is a door other than the Thicket's entrance.
 
-  The one distinction that matters about a place. The tenant's door is
-  where a session is granted, so it alone carries a form, a resume and a
-  logout; and it is the door a browser is already standing at when the
-  posture changes, so its document has to survive the change. Every other
-  door is arrived at fresh and asks only whether the grant happened, so
-  its document has nothing to survive and is renewed instead.
+  The one distinction that matters about a place. The entrance is where a
+  session is granted, so it alone carries a form, a resume and a logout;
+  and it is the door a browser is already standing at when the posture
+  changes, so its document has to survive the change. Every other door is
+  arrived at fresh and asks only whether the grant happened, so its
+  document has nothing to survive and is renewed instead.
 
   Said once because the routes and the transition have to agree about it.
   ```
   [place]
-  (not= (place :guards) (place :tenant)))
+  (not (get place :entrance false)))
 
 (defn- transition/of
   ```
@@ -524,19 +517,18 @@
   (make-event
     {:update
      (fn [_ state]
-       # One capability, held by every view. It belongs to the tenant, not
-       # to any one of its places, so a single push must reach them all.
+       # One capability belongs to the Thicket and is held by every view,
+       # so a single push must reach all of its places.
        (def cap (>base false))
-       # Where a session is granted for this tenant: the place the guardian
-       # holds for the tenant's own symbiont. The other places send anyone
-       # without a session there, and have no other way to know of it.
-       (def home
-         (some |(if (= ($ :guards) ($ :tenant)) ($ :address))
+       # The other places send anyone without a session to the one explicit
+       # entrance, where the shared session is granted.
+       (def entrance
+         (some |(if ($ :entrance) ($ :address))
                (values (get state :spaces {}))))
        (defn view/of [place]
          (merge (select-keys state [:name :secret :key])
-                (select-keys place [:guards :public :address :tenant])
-                @{:cap/session cap :templates templates :tenant/address home
+                (select-keys place [:guards :public :address :entrance])
+                @{:cap/session cap :templates templates :entrance/address entrance
                   # A transition is a constant -- built once and written
                   # verbatim -- so the place it reopens has to be settled
                   # here, where the place is known, rather than per
@@ -548,7 +540,7 @@
                   # handler goes on writing whatever it finds.
                   :transition/entering
                   (transition/of templates
-                                 (if (place/held-for-another? place)
+                                 (if (place/secondary? place)
                                    :transition/new-membrane
                                    :transition/same-membrane)
                                  place)
@@ -660,9 +652,9 @@
 
 (defh inhabited
   ```
-  Serves the Membrane for a place the guardian holds for a symbiont other
-  than the tenant's own. There is no secret to offer here: the session is
-  granted at the tenant's door, and this door only asks whether it was.
+  Serves the Membrane for a secondary place. There is no secret to offer
+  here: the session is granted at the entrance, and this door only asks
+  whether it was.
   ```
   [http/cookies]
   (define :view)
@@ -679,10 +671,10 @@
   (define :view)
   (def {:unauthorized unauthorized} (view :templates))
   (def transition (view :transition/entering))
-  (def {:guards guards :tenant/address home} view)
+  (def {:guards guards :entrance/address entrance} view)
   (if ((view :cap/session) req)
     (http/stream-with <handover/> (handover/transition view guards transition))
-    (http/stream (content/into-stage (unauthorized guards home)))))
+    (http/stream (content/into-stage (unauthorized guards entrance)))))
 
 (defn- navigations-only
   ```
@@ -730,12 +722,12 @@
   ```
   Builds the routes of one living space.
 
-  The tenant's own place is where a session is granted, and it alone
-  carries the form, the resume and the logout. Every other place the
-  guardian holds asks only whether that grant happened.
+  The entrance is where the shared session is granted, and it alone carries
+  the form, the resume and the logout. Every other place the guardian holds
+  asks only whether that grant happened.
   ```
   [templates place]
-  (if (place/held-for-another? place)
+  (if (place/secondary? place)
     @{"/" (http/dispatch {"GET" inhabited})
       "/content" (http/dispatch {"GET" inhabited/content})}
     (merge
@@ -756,9 +748,9 @@
   Assembles shared sentry HTTP routes and RPC functions.
 
   Every address the sentry answers on gets the same functions, its own and
-  each one it stands in for: the tree pushes a tenant's capability to
-  whoever inhabits that tenant's address, and it must find a `:refresh`
-  there whether the symbiont or its guardian is holding it.
+  each one it stands in for: the tree pushes the Thicket's capability to
+  every registered symbiont, and it must find a `:refresh` at each address
+  whether the symbiont or its guardian is holding it.
   ```
   [templates rpc-funcs]
   (make-update

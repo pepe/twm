@@ -323,6 +323,8 @@ A Thicket is a bounded living software organism whose identity lies in lawful co
 
 It is not defined by uninterrupted process execution or unchanged implementation.
 
+One Thicket holds one sovereign beneficiary context. Distinct beneficiary contexts that require isolated truth or authority belong in distinct Thickets, related only through declared Membranes.
+
 It is inhabited by Symbionts, joined through Mycelium, bounded by Membranes, and encountered as Flower.
 
 ---
@@ -337,7 +339,7 @@ A Tree is a canonical-authority symbiont.
 
 An Avatar is a human-facing symbiont.
 
-A Cosymbiont is a tenant-bound, Avatar-like symbiont using only a selected part of the domain information.
+A Cosymbiont is a scope-bound, Avatar-like symbiont using only a selected part of the domain information.
 
 A Steward is an operational-power symbiont.
 
@@ -375,7 +377,7 @@ An Avatar does not decide canonical domain truth.
 
 Avatars act. Trees decide canonically.
 
-A Cosymbiont is an Avatar-like symbiont bound to a tenant or restricted participant context. It uses only a selected part of domain information and participates from within a limited scope.
+A Cosymbiont is an Avatar-like symbiont bound to a restricted participant context. It uses only a selected part of domain information and participates from within a limited scope.
 
 A Cosymbiont is not a smaller Tree. It does not own canonical domain truth unless separately declared as a Tree. It is a scoped participant in perception, action, and intent.
 
@@ -1982,7 +1984,7 @@ TWM separates domain truth from operative truth.
 
 Domain truth describes what the Field means.
 
-It includes tenants, todos, tracks, notes, decisions, consequences, domain states, domain relations, and benefit-relevant facts.
+It includes beneficiaries, todos, tracks, notes, decisions, consequences, domain states, domain relations, and benefit-relevant facts.
 
 Operative truth describes how a role participates.
 
@@ -3710,7 +3712,7 @@ TWM concepts should be mapped into OPM as stereotypes, patterns, or in-zoomed st
 | Symbiont | object stereotype / domain pattern | Executable participant with lifecycle states and processes |
 | Demiurge | lifecycle authority stereotype | Object or agent-like object with lifecycle processes; not domain authority |
 | Avatar | human-facing symbiont stereotype | Mediates perception, intention, Saplings, and action |
-| Cosymbiont | specialization of Avatar-like symbiont | Tenant- or scope-bound participant |
+| Cosymbiont | specialization of Avatar-like symbiont | Scope-bound participant |
 | Sapling | local working object/state | Non-canonical structured local truth |
 | Shadow | projection object | Derived, shaped, non-authoritative, use-scoped |
 | Fruit | produced state/object | May be canonical, precious, rebuildable, or defensive |

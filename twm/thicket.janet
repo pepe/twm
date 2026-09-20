@@ -159,9 +159,9 @@
   ```
   Saves the session capability in every view the symbiont serves.
 
-  The capability is the tenant's, not any one place's, and a symbiont
-  standing in several of a tenant's places must answer for all of them
-  from the single push that carries it.
+  The capability belongs to the Thicket, not any one place, and a symbiont
+  standing in several places must answer for all of them from the single
+  push that carries it.
 
   With `announce`, readiness is emitted from this event's watch, after
   the capability update has reached every view. A peer therefore cannot
@@ -206,16 +206,15 @@
   ```
   50)
 
-(defn ^tenant/register
+(defn ^tree/register
   "Registers outside the manager, then installs the capability before successors."
-  [peer &opt tenant announce & after]
+  [peer &opt announce & after]
   (make-watch
     (fn [_ state _]
       (def name (state :name))
-      (default tenant (or (state :guards) name))
       (put register/at peer (os/clock))
       (producer
-        (def cap (rpc/call (state peer) :register [name tenant] true))
+        (def cap (rpc/call (state peer) :register [name] true))
         (produce (^session/cap cap announce) ;(or after []))))
     (. "register " peer)))
 
@@ -270,7 +269,6 @@
   ```
   [_ state _]
   (def {:peers peers :name name} state)
-  (def tenant ((>or (=<> :guards) (=<> :name)) state))
   (def unsaid @[])
   (each peer peers
     (def client (state peer))
@@ -278,7 +276,7 @@
       (when-let [_ (client :stream)
                  dereg (client :deregister)]
         (unless (first (protect (ev/with-deadline dereg/patience
-                                  (dereg client name tenant))))
+                                  (dereg client name))))
           (array/push unsaid peer)))
       # Bounded for the same reason as the goodbye above. `protect`
       # catches errors but not parking, and a close that parks holds
@@ -300,13 +298,8 @@
            Stop)
   :ok)
 
-(defn ^tenant/refresh-view
-  "Requests an asynchronous Tree snapshot for the tenant and its living spaces."
-  [& colls]
-  (projection/^refresh colls))
-
-(defn ^peer/refresh-view
-  "Requests an asynchronous Tree snapshot for the current peer's tenant."
+(defn ^tree/refresh-view
+  "Requests an asynchronous Tree snapshot for the Thicket's living spaces."
   [& colls]
   (projection/^refresh colls))
 

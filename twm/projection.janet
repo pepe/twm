@@ -41,11 +41,10 @@
          (each coll (if (dictionary? (request :colls)) (keys (request :colls)) (request :colls))
            (put requested coll true)))
        (def colls (keys requested))
-       (def tenant (keyword (or (state :tenant) (state :guards) (state :name))))
        (def tree (state :tree))
        (producer
          (def [ok answer]
-           (protect (ev/with-deadline 8 (rpc/call tree :snapshot [tenant colls] true))))
+           (protect (ev/with-deadline 8 (rpc/call tree :snapshot [colls] true))))
          (var applied false)
          (var failure answer)
          (produce

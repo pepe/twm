@@ -21,9 +21,12 @@
   (let [c @[]
         t @{}
         =>membrane (=> :membrane :nodes symbiont)
-        =>neighbors (=> =>membrane :neighbors)]
+        =>neighbors (=> =>membrane :neighbors)
+        =>entrance (=> :membrane :nodes values
+                       (>find-from-start (??? {:entrance true?})))]
     (=>
       (<:- t :build-path (=> :deploy :build-path))
+      (<:- t :entrance/address (=> =>entrance :address))
       (>if =>membrane
            (>if (=> =>membrane :rpc)
                 (<:= t (=> =>membrane :rpc |{:membrane/rpc $}))
@@ -93,9 +96,7 @@
     (=> (<:- t :thicket (=> :name))
         (<:- t :psk (=> :mycelium :psk))
         (<:= t (=> :handles handle))
-        (<- c (=> :handles handle :reaches))
-        (<:- t :rpc (=> :membrane :nodes
-                        (fn [b] (b (array/peek c))) :rpc))
-        (<:- t :tenant (=> :symbionts
-                           (fn [b] (b (array/pop c))) :tenant))
-        (>base t))))
+         (<- c (=> :handles handle :reaches))
+         (<:- t :rpc (=> :membrane :nodes
+                         (fn [b] (b (array/peek c))) :rpc))
+         (>base t))))

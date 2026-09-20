@@ -16,8 +16,8 @@
 
 (start-suite :asynchronous-coalescing)
 (def calls @[])
-(def s @{:name :tenant :view @{:notify @{} :focused false}
-         :tree @{:stream true :snapshot (fn [_ tenant colls]
+(def s @{:name :projection :view @{:notify @{} :focused false}
+         :tree @{:stream true :snapshot (fn [_ colls]
                             (array/push calls colls)
                             (ev/sleep 0.05)
                             {:epoch "a" :revision 1
