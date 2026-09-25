@@ -17,8 +17,8 @@
 (start-suite :asynchronous-coalescing)
 (def calls @[])
 (def s @{:name :projection :view @{:notify @{} :focused false}
-         :tree @{:stream true :snapshot (fn [_ colls]
-                            (array/push calls colls)
+         :tree @{:stream true :snapshot (fn [_ colls owner]
+                            (array/push calls [colls owner])
                             (ev/sleep 0.05)
                             {:epoch "a" :revision 1
                              :values (tabseq [coll :in colls] coll true)})}})
@@ -27,6 +27,8 @@
 (assert (not (get-in s [:view :focused])) "state manager returns before the network does")
 (:await manager)
 (assert (= 1 (length calls)) "a queued burst coalesces into one snapshot")
+(assert (= :projection (get-in calls [0 1]))
+        "a snapshot names whose session it asks for")
 (assert (get-in s [:view :focused]))
 (assert (not (s :projection/running)))
 (put (s :tree) :snapshot (fn [&] (error "offline")))
@@ -34,4 +36,24 @@
 (:await manager)
 (assert (= "offline" (get-in s [:view :projection/error])))
 (assert (not (s :projection/running)) "failure releases the in-flight slot")
+(end-suite)
+
+(start-suite :session-owner)
+(assert (= :door (session/owner @{:name :door :guards :place}))
+        "a guardian owns the sessions its entrance grants")
+(assert (= :door (session/owner @{:name :place :guarded-by :door}))
+        "a guarded symbiont's session is its guardian's")
+(assert (= :student (session/owner @{:name :student}))
+        "anything else names only itself")
+(def guarded-calls @[])
+(def g @{:name :place :guarded-by :door :view @{:notify @{}}
+         :tree @{:stream true :snapshot (fn [_ colls owner]
+                            (array/push guarded-calls owner)
+                            {:epoch "a" :revision 1
+                             :values (tabseq [coll :in colls] coll true)})}})
+(def guarded-manager (make-manager g))
+(:transact guarded-manager (projection/^refresh [:cap/session]))
+(:await guarded-manager)
+(assert (deep= @[:door] guarded-calls)
+        "a guarded symbiont asks for its guardian's session")
 (end-suite)

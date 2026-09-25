@@ -159,9 +159,9 @@
   ```
   Saves the session capability in every view the symbiont serves.
 
-  The capability belongs to the Thicket, not any one place, and a symbiont
-  standing in several places must answer for all of them from the single
-  push that carries it.
+  The capability belongs to the guardian whose entrance granted it, not to
+  any one place it holds, and a symbiont standing in several of its places
+  must answer for all of them from the single push that carries it.
 
   With `announce`, readiness is emitted from this event's watch, after
   the capability update has reached every view. A peer therefore cannot
@@ -214,7 +214,10 @@
       (def name (state :name))
       (put register/at peer (os/clock))
       (producer
-        (def cap (rpc/call (state peer) :register [name] true))
+        # The owner says whose session the returned capability should
+        # open. A tree keeping one for the whole Thicket ignores it.
+        (def cap (rpc/call (state peer) :register
+                           [name (session/owner state)] true))
         (produce (^session/cap cap announce) ;(or after []))))
     (. "register " peer)))
 

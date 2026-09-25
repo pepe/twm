@@ -4,14 +4,22 @@
 (defdyn *view* "View for handlers")
 
 (defn session/publish
-  "Publishes a session from outside the manager, requiring an applied Tree receipt."
-  [session]
+  ```
+  Publishes a session from outside the manager, requiring an applied Tree receipt.
+
+  The session is said together with its `owner`, the guardian whose door
+  it opens -- by default this symbiont's own, `session/owner`. A tree
+  keeping one session for the whole Thicket ignores it.
+  ```
+  [session &opt owner]
   (def context @{})
   (produce/applied
     [(make-update
        (fn [_ state]
-         (put context :tree (state :tree))))])
-  (def receipt (rpc/call (context :tree) :session/new [session]))
+         (put context :tree (state :tree))
+         (put context :owner (session/owner state))))])
+  (def receipt (rpc/call (context :tree) :session/new
+                         [session (or owner (context :owner))]))
   (assert (= :applied (get receipt :status)) "Tree did not acknowledge an applied session")
   receipt)
 

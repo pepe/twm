@@ -1051,6 +1051,20 @@ dynamics as set by *rpc-defines*.```
        util/bin2hex
        freeze))
 
+(defn session/owner
+  ```
+  The guardian whose door a session of this symbiont's opens.
+
+  A session is granted at a guardian's entrance, so it is the guardian's:
+  a guarded symbiont answers with the one it is `:guarded-by`, a guardian
+  with its own name. Anything else names only itself, and nobody grants a
+  session there. A tree that keeps one session for the whole Thicket may
+  ignore it; one that keeps a session per door needs it said, because an
+  RPC call does not tell the callee who is calling.
+  ```
+  [state]
+  (get state :guarded-by (state :name)))
+
 (defn <script/redirect/>
   "Navigates only after the target reports readiness; optionally require its role."
   [&opt address role]

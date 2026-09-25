@@ -44,7 +44,11 @@
        (def tree (state :tree))
        (producer
          (def [ok answer]
-           (protect (ev/with-deadline 8 (rpc/call tree :snapshot [colls] true))))
+           # The owner says whose session `:cap/session` should be. A tree
+           # keeping one for the whole Thicket ignores it.
+           (protect (ev/with-deadline 8 (rpc/call tree :snapshot
+                                                  [colls (session/owner state)]
+                                                  true))))
          (var applied false)
          (var failure answer)
          (produce

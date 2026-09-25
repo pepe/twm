@@ -35,7 +35,10 @@ A consuming project imports `twm/...` (installed) for the organism and
 A Tree born onto an empty store endows itself from its configured
 `:seed`. Sessions are granted (by the Demiurge at spawn, or by the Tree
 at registration) and borne as `:cap/session` — a symbiont verifies its
-cap; it never reads the registry.
+cap; it never reads the registry. A session belongs to the guardian whose
+entrance granted it, and every call that publishes or reads one names
+that guardian (`session/owner`), so a Tree may keep one per door; a Tree
+keeping one for the whole Thicket ignores the name.
 
 ## The Shadow is not the Tree
 
