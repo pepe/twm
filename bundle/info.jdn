@@ -10,4 +10,4 @@
  # installed, which bundle/install checks by name.
  :jpm-dependencies ["spork" "jhydro" "https://git.sr.ht/~pepe/gp"]
  :dependencies ["spork" "jhydro" "gp"]
- :version "0.2.1"}
+ :version "0.3.0"}
