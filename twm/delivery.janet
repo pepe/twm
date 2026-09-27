@@ -18,13 +18,19 @@
        (producer
          (def failed @[])
          (def client (state peer))
-         (when (table? client)
+         (if (table? client)
            (each topic batch
              (def [ok _]
                (protect (ev/with-deadline 3
                           (unless (client :stream) (:open client))
                           (:refresh client topic))))
-             (unless ok (array/push failed topic))))
+             (unless ok (array/push failed topic)))
+           # Not retried: a peer with no client may never have one again.
+           # But a peer that was simply not told goes on showing the past
+           # with nothing looking wrong, so the dropping is said.
+           (produce (log "Projection delivery to " peer " dropped "
+                         (string/join (map string batch) " ")
+                         ": no client")))
          (produce
            (make-event
              {:update

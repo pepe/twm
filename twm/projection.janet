@@ -33,7 +33,9 @@
     {:update
      (fn [_ state]
        (set batch (state :projection/pending))
-       (put state :projection/pending @[]))
+       (put state :projection/pending @[])
+       (put state :projection/since (os/clock :monotonic))
+       (put state :projection/stall-said nil))
      :watch
      (fn [_ state _]
        (def requested @{})
@@ -88,10 +90,23 @@
              "install Tree projection"))))}
     "fetch Tree projection"))
 
+(def- stall/patience
+  ```
+  Seconds a snapshot may be out before refreshes queuing behind it are
+  said to be stalled.
+
+  A fetch gives up after eight, and installing it is one event. Once far
+  past that, the fetch has not reported back and never will: every later
+  refresh only joins the queue, and the view goes on showing the past
+  with nothing in the log -- the one fault here that is otherwise silent.
+  ```
+  30)
+
 (defn ^refresh
   "Coalesces projection requests, fetches outside the manager, then runs successors."
   [colls & after]
   (var start false)
+  (var stalled nil)
   (make-event
     {:update
      (fn [_ state]
@@ -105,8 +120,19 @@
                             (let [r @{:colls @{} :after []}] (array/push pending r) r)))
            (each coll colls (put (request :colls) coll true)))
          (array/push pending {:colls colls :after after}))
-       (unless (state :projection/running)
-         (put state :projection/running true)
-         (set start true)))
-     :watch (fn [&] (when start (^pump)))}
+       (if (state :projection/running)
+         (let [now (os/clock :monotonic)
+               waited (- now (get state :projection/since now))]
+           (when (and (> waited stall/patience)
+                      (not (state :projection/stall-said)))
+             (put state :projection/stall-said true)
+             (set stalled waited)))
+         (do (put state :projection/running true)
+             (set start true))))
+     :watch (fn [&]
+              (cond
+                start (^pump)
+                stalled (log "Tree projection has waited "
+                             (math/round stalled)
+                             "s for a snapshot; refreshes are queuing behind it")))}
     "request Tree projection"))

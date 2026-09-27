@@ -461,10 +461,13 @@ dynamics as set by *rpc-defines*.```
               # report that has lost the half naming what went wrong.
               (eprin (string/format "%s HTTP Supervisor: %q\n" name err))
               (when (dyn :debug) (debug/stacktrace fiber))
-              (protect
-                (:write conn
-                        (http/internal-server-error
-                          (string "Internal Server Error: " err)))))
+              # A stream that failed has already sent its head, and a
+              # second one written now would land inside its body.
+              (unless (http/response-started? fiber)
+                (protect
+                  (:write conn
+                          (http/internal-server-error
+                            (string "Internal Server Error: " err))))))
             # Neither the answer nor the closing is allowed to raise. A
             # vacated space hands its accepting fiber's failure here, and
             # what that fiber inherited under :conn is a connection that
@@ -704,8 +707,12 @@ dynamics as set by *rpc-defines*.```
   [_manager err]
   (match err
     ([at event f] (keyword? at) (valid? event) (fiber? f))
-    (do (eprin (string at " failed for " (event :name)
-                       ": " (fiber/last-value f) "\n"))
+    # Formatted rather than concatenated: a failure carried back over RPC
+    # is a struct, and a struct joined onto a string says `<struct 0x...>`.
+    (do (eprin (let [v (fiber/last-value f)]
+                 (string/format (if (string? v) "%s failed for %s: %s\n"
+                                  "%s failed for %s: %q\n")
+                                at (event :name) v)))
         (when (dyn :debug) (debug/stacktrace f)))
     (eprin (string "Event manager failure: " err "\n"))))
 

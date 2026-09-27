@@ -20,3 +20,21 @@
 (assert (not (get-in state [:delivery :listener :running])))
 (assert (empty? (get-in state [:delivery :listener :pending])))
 (end-suite)
+
+(start-suite :peer-without-client)
+# Not retried, since a peer with no client may never have one, but said:
+# a peer that is simply not told goes on showing the past.
+(def said @"")
+(def lonely @{:view @{} :log true})
+(def lonely-manager (make-manager lonely))
+(def err-before (dyn :err))
+(setdyn :err said)
+(:transact lonely-manager (delivery/^invalidate :gone :todos))
+(:await lonely-manager)
+(setdyn :err err-before)
+(assert (string/find "Projection delivery to gone dropped todos: no client"
+                     (string said))
+        "notices for a peer with no client are dropped aloud")
+(assert (not (get-in lonely [:delivery :gone :running]))
+        "and nothing is left running for it")
+(end-suite)
