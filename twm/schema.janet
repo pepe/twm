@@ -28,6 +28,11 @@
    :log boolean?
    :diagnostic (?optional boolean?)})
 
+(def?! config/janet-source
+  dictionary?
+  {:repo present-string?
+   :rev present-string?})
+
 (def?! config/deploy
   dictionary?
   {:host present-string?
@@ -36,6 +41,7 @@
    :data-path (?optional present-string?)
    :env (?optional present-string?)
    :repo (?optional present-string?)
+   :janet-source (?optional config/janet-source?)
    :dry (?optional boolean?)
    :debug (?optional boolean?)
    :log (?optional boolean?)})

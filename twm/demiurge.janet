@@ -764,6 +764,37 @@
   (make-update
     (fn [_ state] (put state :bootstrap (keyword arg)))))
 
+(defn janet/build-steps
+  ```
+  Steps that build Janet from `source` and install it over the environment.
+
+  `janet-pm full-env` copies the box's own Janet into the environment: the
+  interpreter, `libjanet` and the headers every peer is linked against.
+  Given a `:janet-source` in `:deploy`, that copy is replaced by a Janet
+  built from the named repository and revision, installed with the
+  environment as its prefix, so one environment can run a Janet the box
+  does not. Without one, the box's Janet stays, as it always has.
+
+  The flags are the box's own: no LTO, which pins every static archive to
+  the GCC that wrote it. The source sits beside the checkout rather than
+  in it, where it would make the checkout dirty.
+
+  The steps are for `ssh-cmds`, placed after `full-env` and before the
+  environment is activated.
+  ```
+  [source bp env]
+  (def {:repo repo :rev rev} source)
+  (assert (and (present-string? repo) (present-string? rev))
+          ":janet-source needs a :repo and a :rev")
+  (def jsp (string bp "-janet"))
+  (def make-vars [(string "PREFIX=" (path/posix/join bp env)) "CFLAGS='-fPIC -O2'"])
+  [[:rm "-rf" jsp]
+   [:git :clone "--quiet" repo jsp]
+   [:git :-C jsp :checkout "--quiet" rev]
+   [:make :-C jsp "-j4" ;make-vars]
+   [:make :-C jsp :test ;make-vars]
+   [:make :-C jsp :install ;make-vars]])
+
 (def HeartCheck
   "Heart beat checker function"
   (heart-beat

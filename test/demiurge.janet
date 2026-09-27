@@ -1,6 +1,7 @@
 (use spork/test)
 (import ../twm/thicket :prefix "")
 (import ../twm/demiurge :prefix "")
+(import ../twm/schema :prefix "")
 
 # The heartbeat decides which peers get killed and raised, and it decides it
 # from three tables that other events keep writing to. What has repeatedly
@@ -167,4 +168,32 @@
   (:transact manager (^peer/save-spawned :pepe :mycelium))
   (assert (empty? (decisions CheckPeers state))
           "and none once it is reached, having missed nothing itself"))
+(end-suite)
+
+(start-suite :janet-from-source)
+# The Janet a bootstrap builds is installed over the environment's own
+# copy, so its prefix is the environment; its source sits beside the
+# checkout, never inside it.
+(let [source {:repo "https://github.com/pepe/janet.git" :rev "b86ad57a"}
+      steps (janet/build-steps source "/srv/src/app" "prod")
+      vars ["PREFIX=/srv/src/app/prod" "CFLAGS='-fPIC -O2'"]]
+  (assert (deep= [[:rm "-rf" "/srv/src/app-janet"]
+                  [:git :clone "--quiet" "https://github.com/pepe/janet.git" "/srv/src/app-janet"]
+                  [:git :-C "/srv/src/app-janet" :checkout "--quiet" "b86ad57a"]
+                  [:make :-C "/srv/src/app-janet" "-j4" ;vars]
+                  [:make :-C "/srv/src/app-janet" :test ;vars]
+                  [:make :-C "/srv/src/app-janet" :install ;vars]]
+                 steps)
+          "it is cloned, checked out, built, tested and installed in that order")
+  (assert-error "a source without a revision is refused"
+                (janet/build-steps {:repo "https://github.com/pepe/janet.git"}
+                                   "/srv/src/app" "prod")))
+(assert (config/deploy? {:host "h" :release-path "/r"})
+        "a deploy without a Janet source is still a deploy")
+(assert (config/deploy? {:host "h" :release-path "/r"
+                         :janet-source {:repo "r" :rev "v"}})
+        "a deploy may name the Janet it builds")
+(assert (not (config/deploy? {:host "h" :release-path "/r"
+                              :janet-source {:repo "r"}}))
+        "but only with both a repository and a revision")
 (end-suite)
