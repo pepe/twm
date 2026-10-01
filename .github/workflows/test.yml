@@ -1,0 +1,97 @@
+name: test
+
+# Like .build.yml, this builds Janet's master branch, and gp's from
+# git.sr.ht before twm.
+
+on: [push, workflow_dispatch]
+
+jobs:
+  posix:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: twm
+      - uses: actions/checkout@v7
+        with:
+          repository: janet-lang/janet
+          path: janet
+      - uses: actions/checkout@v7
+        with:
+          repository: janet-lang/spork
+          path: spork
+      - name: janet
+        run: cd janet && make -j4 && sudo make install
+      - name: spork
+        run: cd spork && sudo janet --install .
+      - name: gp
+        run: |
+          git clone --recursive https://git.sr.ht/~pepe/gp
+          cd gp
+          sudo /usr/local/lib/janet/bin/janet-pm deps
+          /usr/local/lib/janet/bin/janet-pm build
+          sudo /usr/local/lib/janet/bin/janet-pm install
+      - name: twm
+        run: |
+          cd twm
+          /usr/local/lib/janet/bin/janet-pm build
+          sudo /usr/local/lib/janet/bin/janet-pm install
+          /usr/local/lib/janet/bin/janet-pm test
+
+  windows:
+    name: windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 30
+    # Laid out as Janet's Windows installer would: janet.h and the import
+    # libraries in C beside bin, where spork looks from the Library above.
+    # JANET_PREFIX stays unset: with it, spork finds the prefix but never
+    # records where janet.h is, and declare-native fails its assert.
+    env:
+      JANET_PATH: C:\janet\Library
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: twm
+      - uses: actions/checkout@v7
+        with:
+          repository: janet-lang/janet
+          path: janet
+      - uses: actions/checkout@v7
+        with:
+          repository: janet-lang/spork
+          path: spork
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: janet
+        run: |
+          cd janet && call .\build_win.bat || exit /b 1
+          mkdir C:\janet\bin C:\janet\C %JANET_PATH% || exit /b 1
+          copy janet.exe C:\janet\bin || exit /b 1
+          copy janet.lib C:\janet\C || exit /b 1
+          copy build\libjanet.lib C:\janet\C || exit /b 1
+          .\janet.exe tools\patch-header.janet src\include\janet.h src\conf\janetconf.h C:\janet\C\janet.h || exit /b 1
+          echo C:\janet\bin>> %GITHUB_PATH%
+          echo %JANET_PATH%\bin>> %GITHUB_PATH%
+      - name: spork
+        run: cd spork && janet --install .
+      - name: gp
+        run: |
+          git clone --recursive https://git.sr.ht/~pepe/gp || exit /b 1
+          cd gp
+          call janet-pm deps || exit /b 1
+          call janet-pm build || exit /b 1
+          call janet-pm install
+      - name: twm
+        run: |
+          cd twm
+          call janet-pm build || exit /b 1
+          call janet-pm install || exit /b 1
+          call janet-pm test
