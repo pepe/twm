@@ -1,0 +1,4 @@
+# Keep the repository in LF whatever line ends a checkout uses.
+* text=auto
+
+*.jdn linguist-language=Janet
