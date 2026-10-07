@@ -117,7 +117,7 @@
         (def ep (state peer))
         (when (dictionary? ep)
           (protect (:close ep))
-          (put state peer (string (ep :host) ":" (ep :port))))))
+          (put state peer (server/address ep)))))
     (. "remove peer " peer)))
 
 (defn- peer/places

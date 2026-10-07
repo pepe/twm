@@ -59,7 +59,7 @@
     (fn [_ state]
       (def old (state peer))
       (if (table? old)
-        (unless (= address (string (old :host) ":" (old :port)))
+        (unless (= address (server/address old))
           (protect (:close old))
           (put state peer address))
         (put state peer address))

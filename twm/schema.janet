@@ -10,7 +10,7 @@
 
 (def?! url
   present-string?
-  (?matches-peg '(* (to ":") ":" (some :d) -1)))
+  server/address?)
 
 (def?! hash-dictionary
   dictionary?
@@ -41,6 +41,9 @@
    :data-path (?optional present-string?)
    :env (?optional present-string?)
    :repo (?optional present-string?)
+   :repo-ref (?optional present-string?)
+   :dependency-refs (?optional dictionary?)
+   :socket-root (?optional present-string?)
    :janet-source (?optional config/janet-source?)
    :dry (?optional boolean?)
    :debug (?optional boolean?)
@@ -122,6 +125,7 @@
 (def?! config/membrane/http-node
   dictionary?
   {:http url?
+   :socket-mode (?optional (?one-of 8r600 8r660))
    :address (?optional present-string?)
    :entrance (?optional boolean?)
    :neighbors (?optional (>?? all peer?))

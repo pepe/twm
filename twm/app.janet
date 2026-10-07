@@ -205,6 +205,7 @@ dynamics as set by *rpc-defines*.```
   [&]
   (producer
     (ev/sleep 0.001)
+    (server/close-all)
     (exit)))
 
 (defn space/dwell
@@ -304,7 +305,9 @@ dynamics as set by *rpc-defines*.```
   holding the mycelium address the rising symbiont needs.
   ```
   [space kind chan url]
-  (def [_ listener] (server/start chan ;(server/host-port url)))
+  (def [host port] (server/host-port url))
+  (def [_ listener] (server/start chan host port
+                                 (if (= :http kind) (space :socket-mode) 8r600)))
   (put (space/held space) kind
        @{:listener listener :chan chan :url url})
   space)
@@ -324,7 +327,7 @@ dynamics as set by *rpc-defines*.```
   (when-let [view (space :view)] (readiness/settle view :cancelled "space vacated"))
   (each held (values (space/held space))
     (when-let [listener (held :listener)]
-      (protect (:close listener)))
+      (server/close listener))
     (put held :listener nil))
   space)
 
@@ -435,7 +438,7 @@ dynamics as set by *rpc-defines*.```
       (space/dwell view)
       (def chan (ev/chan 128))
       (space/listen space :http chan http)
-      (produce (logf "Starting %s HTTP server on %s, port %s" name ;(server/host-port http)))
+      (produce (logf "Starting %s HTTP server on %s" name http))
       (http/supervisor
         chan
         (space/attend space (http/on-connection parser))
@@ -640,8 +643,7 @@ dynamics as set by *rpc-defines*.```
         (if space
           (space/listen space :rpc chan url)
           (server/start chan host port))
-        (produce (logf "Starting %s RPC on %s, port %s" name
-                       ;(server/host-port url))
+        (produce (logf "Starting %s RPC on %s" name url)
                  after-start)
         (rpc/supervisor
           chan

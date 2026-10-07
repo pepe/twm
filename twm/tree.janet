@@ -7,7 +7,7 @@
   [peer]
   (make-update
     (fn [_ state]
-      ((>update peer |(string ($ :host) ":" ($ :port))) state))
+      ((>update peer server/address) state))
     (. "restore peer " peer)))
 
 (defn ^peer/disconnect
