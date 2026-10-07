@@ -21,7 +21,7 @@ and pull requests turned off; send patches and reports to <pe@pan.earth>.
 - Janet with the event-loop fix for cancelled producers, "Unregister stream
   from EV upon closure" (#1770), released in v1.42.0. CI builds Janet's
   master branch.
-- `spork`, `jhydro`, and gp 0.4.0 or later, which `janet-pm deps` installs.
+- `spork`, `jhydro`, and gp 0.5.0 or later, which `janet-pm deps` installs.
 - For gp's native modules, a C and a C++17 compiler: MSVC on Windows, GCC
   or Clang elsewhere. twm itself is Janet only.
 
