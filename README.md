@@ -64,6 +64,10 @@ And the ones they stand on:
   saving and granting sessions, and its own `run` and `main`.
 - `twm/symbiont` — `run` and `main` around a symbiont's setup and start
   events.
+- `twm/guarded` — what a guarded symbiont owes the Demiurge's idle
+  timeout: counting its use (`^activity`, `session/checker-with`,
+  `/watching`), reporting it to the ping (`-:ping/active`), and leaving
+  when stopped (`stop/guarded`), telling its live streams first.
 - `twm/schema` — the schemas a configuration is checked against: peers,
   the Tree, sentries, symbionts, mycelium, membrane, and deployment.
 - `twm/navigation` — navigations into a symbiont's mycelium and membrane

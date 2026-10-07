@@ -1152,11 +1152,26 @@ dynamics as set by *rpc-defines*.```
         []))
     (. "send notify " topic)))
 
+(def stage/stand-down
+  ```
+  The topic telling a live stream its symbiont is going.
+
+  A logout is asked for, and answered with its own transition. A stop the
+  demiurge orders -- the idle timeout -- is asked for by nobody, and the
+  stream would simply die under a page still showing a place that has
+  gone. This is how that leaving reaches the page.
+
+  It is the control topic of every stream `view/stream` holds, so it is
+  taken ahead of whatever data is waiting: a stream told to leave does not
+  render first. A stream hears it only if it names it among its topics.
+  ```
+  :stage/stand-down)
+
 (defn view/stream
   "Owns a durable subscription, waits for readiness, renders, and always cleans up."
   [view topics initial render &opt leaving]
   (fn [conn]
-    (def sub (subscription/open view topics :stage/stand-down))
+    (def sub (subscription/open view topics stage/stand-down))
     (var finished false)
     (def disconnected
       (ev/go (fn []
@@ -1171,7 +1186,7 @@ dynamics as set by *rpc-defines*.```
       ((http/stream
          (initial)
          (while (def topic (subscription/take sub))
-           (if (= topic :stage/stand-down)
+           (if (= topic stage/stand-down)
              (do (when leaving (leaving)) (break))
              (render topic)))) conn))))
 

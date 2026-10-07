@@ -10,5 +10,6 @@
 (assert-docs "../twm/dev")
 (assert-docs "../twm/thicket")
 (assert-docs "../twm/sentry")
+(assert-docs "../twm/guarded")
 (assert-docs "../twm/demiurge")
 (end-suite)
