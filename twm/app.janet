@@ -853,9 +853,16 @@ dynamics as set by *rpc-defines*.```
       # leave the rest of themselves as stray lines. Datastar reads what it
       # was given, which is a truncated element and some nonsense, and the
       # selector it was told to replace is emptied rather than replaced.
+      #
+      # A carriage return ends a field too, alone as much as before a
+      # newline, and text typed into a form ends its lines with both: the
+      # first line cut from it keeps its CR. HTML reads every CR as a
+      # newline anyway, so each becomes one here and nothing is lost.
       (string/join
         (map |(string "data: elements " $)
-             (string/split "\n" (string elements)))
+             (string/split "\n" (->> (string elements)
+                                     (string/replace-all "\r\n" "\n")
+                                     (string/replace-all "\r" "\n"))))
         "\n")
       "\n\n")))
 

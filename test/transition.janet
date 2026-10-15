@@ -58,6 +58,18 @@
 (let [[[_ body]] (chunks (ds/msg/patch-elements "<p>one line</p>" "#p" "inner"))]
   (assert (= 1 (length (string/find-all "data: elements " body)))
           "single-line markup is unchanged"))
+
+# A carriage return ends a field as well. The first line of text typed
+# into a form keeps its CR, and the invoices after it were never drawn.
+(let [[[size body]] (chunks (ds/msg/patch-elements
+                              "<div id=\"list\"><p>Ing. Josef\r</p><p>two\r\nlines</p><p>last</p></div>"
+                              nil "replace"))]
+  (assert (= size (length body)) "the chunk still declares its true length")
+  (assert (not (string/find "\r" body)) "no carriage return is left in a field")
+  (assert (= 3 (length (string/find-all "data: elements " body)))
+          "a lone CR and a CRLF each start a data line of their own")
+  (assert (string/has-suffix? "data: elements lines</p><p>last</p></div>\n\n" body)
+          "and the markup after them is all there"))
 (end-suite)
 
 (start-suite :a-whole-transition)
