@@ -44,11 +44,7 @@
   (make-effect
     (fn log [_ state _]
       (when (state :log)
-        (let [now (os/clock)
-              t (math/floor now)
-              p (string (mod now 1))]
-          (eprin (string (dt/format-date-time t) "." (slice p 2 7)
-                         " - " ;msg "\n")))) "log")))
+        (eprin (string (dt/format-stamp (os/clock)) " - " ;msg "\n")))) "log"))
 
 (defn diag
   "Create a redacted diagnostic logging event.
@@ -60,11 +56,7 @@
   (make-effect
     (fn diagnostic [_ state _]
       (when (state :diagnostic)
-        (let [now (os/clock)
-              t (math/floor now)
-              p (string (mod now 1))]
-          (eprin (string (dt/format-date-time t) "." (slice p 2 7)
-                         " - DIAG " ;msg "\n")))) "diagnostic")))
+        (eprin (string (dt/format-stamp (os/clock)) " - DIAG " ;msg "\n")))) "diagnostic"))
 
 (defn logr
   ```
