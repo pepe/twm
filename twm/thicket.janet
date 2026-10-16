@@ -216,8 +216,7 @@
       (producer
         # The owner says whose session the returned capability should
         # open. A tree keeping one for the whole Thicket ignores it.
-        (def cap (rpc/call (state peer) :register
-                           [name (session/owner state)] true))
+        (def cap (:register (state peer) name (session/owner state)))
         (produce (^session/cap cap announce) ;(or after []))))
     (. "register " peer)))
 

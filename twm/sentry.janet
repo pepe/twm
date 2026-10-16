@@ -18,8 +18,7 @@
        (fn [_ state]
          (put context :tree (state :tree))
          (put context :owner (session/owner state))))])
-  (def receipt (rpc/call (context :tree) :session/new
-                         [session (or owner (context :owner))]))
+  (def receipt (:session/new (context :tree) session (or owner (context :owner))))
   (assert (= :applied (get receipt :status)) "Tree did not acknowledge an applied session")
   receipt)
 
@@ -35,7 +34,7 @@
 (defn session/settled?
   "Checks exact session equality; an ended session is not an authentication capability."
   [tree session]
-  (match (protect (rpc/call tree :session/matches [session] true))
+  (match (protect (:session/matches tree session))
     [true matches] (truthy? matches)
     false))
 

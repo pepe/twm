@@ -141,7 +141,7 @@
       (def client (if guardian (state guardian)))
       (producer
         (when (and client (dictionary? client))
-          (def [ok err] (protect (ev/with-deadline 3 (rpc/call client :space/resume [peer] true))))
+          (def [ok err] (protect (ev/with-deadline 3 (:space/resume client peer))))
           (unless ok (produce (log "Cannot return " peer " to " guardian ": " err))))))
     (. "return place of " peer)))
 
