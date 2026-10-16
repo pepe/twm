@@ -20,9 +20,7 @@
          (def client (state peer))
          (if (table? client)
            (each topic batch
-             (def [ok _]
-               (protect (unless (client :stream) (:open client))
-                        (:refresh client topic)))
+             (def [ok _] (protect (:refresh client topic)))
              (unless ok (array/push failed topic)))
            # Not retried: a peer with no client may never have one again.
            # But a peer that was simply not told goes on showing the past
