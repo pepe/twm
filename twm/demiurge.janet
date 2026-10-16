@@ -141,7 +141,7 @@
       (def client (if guardian (state guardian)))
       (producer
         (when (and client (dictionary? client))
-          (def [ok err] (protect (ev/with-deadline 3 (:space/resume client peer))))
+          (def [ok err] (protect (:space/resume client peer)))
           (unless ok (produce (log "Cannot return " peer " to " guardian ": " err))))))
     (. "return place of " peer)))
 
@@ -174,7 +174,7 @@
         (make-watch
           (producer
             (when (dictionary? pc)
-              (def [ok err] (protect (ev/with-deadline 3 (:stop pc))))
+              (def [ok err] (protect (:stop pc)))
               (unless ok (produce (log "Stop request for " peer " failed: " err)))
               (protect (:close pc)))))] )}
     (. "stop peer " peer)))

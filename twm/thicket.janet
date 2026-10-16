@@ -177,42 +177,12 @@
      :watch (if announce [(projection/^ready) AetherReady])}
     "save session"))
 
-(def register/at
-  ```
-  When each symbiont last registered on a peer, by peer name.
-
-  Kept so the gap to the *next* registration in the same boot can be said
-  outright. A symbiont's `^start` produces its tree registration and then,
-  through `after-reg`, its registration with whatever divines for it; those
-  two are ordinarily separated by 120-200us, and on the boots that went on
-  to wedge they collapsed to 20us, in either order.
-
-  That gap was legible only by accident: at 20us the two log lines were
-  landing in the same `write` window and tearing, which is what made those
-  boots conspicuous. Fixing the tearing (see `log`) takes the accident
-  away, so the measurement is made on purpose here instead.
-  ```
-  @{})
-
-(def register/window/tight
-  ```
-  Microseconds below which a boot's two registrations are called TIGHT.
-
-  Drawn from five boots, not from theory: three that collapsed to ~20us
-  and two that took 120us and 200us. Fifty sits between them with room on
-  both sides. It is a mark to grep for, not a threshold anything acts on
-  -- no code branches on this, and it should not until the link from a
-  tight window to a departure that will not run is actually established.
-  ```
-  50)
-
 (defn ^tree/register
   "Registers outside the manager, then installs the capability before successors."
   [peer &opt announce & after]
   (make-watch
     (fn [_ state _]
       (def name (state :name))
-      (put register/at peer (os/clock))
       (producer
         # The owner says whose session the returned capability should
         # open. A tree keeping one for the whole Thicket ignores it.
@@ -227,16 +197,6 @@
     (fn [_ state _]
       (:register (state peer) (state :name)))
     (. "register " peer)))
-
-(def dereg/patience
-  ```
-  Seconds a goodbye may take before the closing goes ahead without it.
-
-  Short on purpose. The peer being said goodbye to is on the same box over
-  a loopback socket, so a goodbye that has not returned in seconds is not
-  slow, it is parked.
-  ```
-  2)
 
 (define-watch ClosePeers
   ```
@@ -258,14 +218,13 @@
   offering no `:deregister` is skipped, and one already closed carries no
   stream to say it over -- so arriving here twice is harmless.
 
-  The goodbye is bounded because it is a synchronous RPC run inline in this
-  watch body, which puts it inside the manager's transaction, and `protect`
-  catches errors but not parking. An unbounded one took production down for
-  37 hours on 2026-08-14: a Leave entered here and never came back, so
-  `^aether/left` was never written, `Exit` was never reached, the door was
-  never handed back, and every visitor got a bare 401 until the box was
-  restarted. A deadline turns the park into an error `protect` already
-  knows what to do with, and keeps the ordering the caller depends on. A
+  The goodbye is a synchronous RPC run inline in this watch body, inside
+  the manager's transaction, so it has to come back: the client bounds
+  every call it makes (gp's `:timeout`, eight seconds unless the client is
+  given another). An unbounded one took production down for 37 hours on
+  2026-08-14: a Leave entered here and never came back, so `^aether/left`
+  was never written, `Exit` was never reached, the door was never handed
+  back, and every visitor got a bare 401 until the box was restarted. A
   peer that misses its goodbye is left holding a ghost client, which is the
   survivable fault described above; the thicket stopping is not.
   ```
@@ -277,20 +236,14 @@
     (when (table? client)
       (when-let [_ (client :stream)
                  dereg (client :deregister)]
-        (unless (first (protect (ev/with-deadline dereg/patience
-                                  (dereg client name))))
+        (unless (first (protect (dereg client name)))
           (array/push unsaid peer)))
-      # Bounded for the same reason as the goodbye above. `protect`
-      # catches errors but not parking, and a close that parks holds
-      # the whole departure behind it -- the Aether, the handing back
-      # of the door, and every peer after this one in the loop.
-      (protect (ev/with-deadline dereg/patience (:close client)))))
+      (protect (:close client))))
   # Said after the closing rather than beside each failure: the whole point
   # is that this body must reach its end, and a log event is produced, not
   # written, so it cannot itself be what stops.
   (tuple ;(seq [peer :in unsaid]
-            (log name "'s goodbye to " peer " did not return in "
-                 dereg/patience "s; closed anyway"))))
+            (log name "'s goodbye to " peer " failed; closed anyway"))))
 
 (defn close-peers-stop
   "RPC function that closes peers and stops the server"

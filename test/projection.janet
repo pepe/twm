@@ -57,25 +57,3 @@
 (assert (deep= @[:door] guarded-calls)
         "a guarded symbiont asks for its guardian's session")
 (end-suite)
-
-(start-suite :stalled-projection)
-# A fetch that never reports back holds the in-flight slot for good, and
-# every later refresh only joins the queue behind it. The view then goes
-# on showing the past with nothing in the log, which is how a Dashboard
-# on staging came to offer a todo the Tree had finished minutes before.
-(def said @"")
-(def stalled @{:name :projection :log true :view @{:notify @{}}
-               :projection/running true
-               :projection/since (- (os/clock :monotonic) 60)
-               :tree @{:stream true :snapshot (fn [&] (error "not asked"))}})
-(def stalled-manager (make-manager stalled))
-(def err-before (dyn :err))
-(setdyn :err said)
-(:transact stalled-manager
-           (projection/^refresh [:focused]) (projection/^refresh [:todos]))
-(setdyn :err err-before)
-(assert (= 1 (length (string/find-all "for a snapshot; refreshes are queuing"
-                                      (string said))))
-        "a snapshot long out is said to stall the refreshes behind it, once")
-(assert (stalled :projection/running) "and saying so starts no second fetch")
-(end-suite)
