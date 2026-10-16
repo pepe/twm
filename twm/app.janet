@@ -1,6 +1,5 @@
 (import ./base :prefix "" :export true)
 (import gp/net/uri :export true)
-(import ./subscription :export true)
 (import ./readiness :export true)
 (import ./handover :export true)
 
@@ -1094,73 +1093,6 @@ dynamics as set by *rpc-defines*.```
   [s]
   (string/replace-all "\n" "<br>" s))
 
-(defn ^notify/subscribe
-  "Subscribes a channel for a notification topic."
-  [chan topic]
-  (make-update
-    (def-state _
-      (=> :view :notify topic (>add chan)))
-    (. "subscribe notify " topic)))
-
-(def notify/patience
-  ```
-  Seconds a subscriber is given to take its notification before the send
-  goes on without it.
-
-  A subscription is one-shot -- every send clears the topic and a living
-  reader re-subscribes as it comes round its loop -- so a channel that
-  cannot take is not a reader that is busy, it is a reader that is gone. A
-  handler that died keeps its place in `:notify` and nothing else ever
-  removes it, while its channel holds fewer slots than the topics it was
-  subscribed to: a few ordinary notifications fill it and it never empties
-  again.
-
-  Short for the same reason as `dereg/patience`. The reader is a fiber in
-  this very process, so a take that has not happened in seconds will not
-  happen. An unbounded give here is what let one dead stream stop a
-  symbiont from ever standing down: the give sits in front of the goodbye,
-  the Aether, and the handing back of the door, so nothing that follows it
-  is reached until it returns.
-  ```
-  2)
-
-(defn ^notify/send-one
-  ```
-  Sends one topic notification to a subscribed channel.
-
-  Bounded, and the failure is swallowed rather than raised. A subscriber
-  that will not take is one this send has no further use for, and the
-  clear that follows every send is what removes it. Raising instead would
-  leave the remaining subscribers untold, which is the opposite of what a
-  send is for.
-  ```
-  [chan topic]
-  (make-effect
-    (fn [&]
-      (protect (ev/with-deadline notify/patience (:give chan topic))))
-    (. "send one notify " topic)))
-
-(defn ^notify/clear
-  "Clears all subscriptions for a notification topic."
-  [topic]
-  (make-update
-    (fn [_ {:view {:notify {topic chans}}}]
-      (array/clear chans))
-    (. "clear notify " topic)))
-
-(defn ^notify/send
-  "Sends a topic to all subscribers and clears the subscription queue."
-  [topic]
-  (make-watch
-    (fn [_ {:view view} _]
-      (subscription/publish view topic)
-      (if-let [chans (get-in view [:notify topic])]
-        [;(seq [chan :in chans]
-            (^notify/send-one chan topic))
-         (^notify/clear topic)]
-        []))
-    (. "send notify " topic)))
-
 (def stage/stand-down
   ```
   The topic telling a live stream its symbiont is going.
@@ -1170,40 +1102,99 @@ dynamics as set by *rpc-defines*.```
   stream would simply die under a page still showing a place that has
   gone. This is how that leaving reaches the page.
 
-  It is the control topic of every stream `view/stream` holds, so it is
-  taken ahead of whatever data is waiting: a stream told to leave does not
-  render first. A stream hears it only if it names it among its topics.
+  It is read ahead of whatever data is waiting, so a stream told to leave
+  does not render first, and `^notify/send` keeps it a slot no data can
+  take. A stream hears it only if it names it among its topics.
   ```
   :stage/stand-down)
 
+(defn ^notify/subscribe
+  ```
+  Subscribes `chan` to `topics` in `view`, for as long as its reader reads.
+
+  A reader subscribes once and unsubscribes on its way out. Nothing a send
+  does takes it off, so no notice can fall between one read and the next.
+  ```
+  [view chan & topics]
+  (make-update
+    (fn [&]
+      (each topic topics
+        (update-in view [:notify topic] |(array/push (or $ @[]) chan))))
+    (. "subscribe notify " (string/join (map string topics) " "))))
+
+(defn ^notify/unsubscribe
+  "Takes `chan` off every topic in `view`."
+  [view chan]
+  (make-update
+    (fn [&]
+      (eachp [_ chans] (get view :notify {})
+        (while (def i (index-of chan chans)) (array/remove chans i))))
+    "unsubscribe notify"))
+
+(defn ^notify/send
+  ```
+  Gives `topic` to every channel subscribed to it, and never waits.
+
+  A channel is given it only while it has room, so a reader that is slow
+  or gone costs the sender nothing. Data leaves the last slot free, which
+  is how `stage/stand-down` always finds one. A reader whose channel filled
+  may have missed a topic; `notify/take` says so.
+  ```
+  [topic]
+  (make-effect
+    (fn [_ {:view view} _]
+      (def kept (if (= topic stage/stand-down) 0 1))
+      (each chan (get-in view [:notify topic] [])
+        (when (< (+ (ev/count chan) kept) (ev/capacity chan))
+          (ev/give chan topic))))
+    (. "send notify " topic)))
+
+(defn notify/take
+  ```
+  Takes what was given to `chan` since its reader last looked, each topic
+  once. `stage/stand-down` comes alone, ahead of any data, and nil says the
+  reader is gone. A channel that had filled may have dropped a topic, so
+  then every one of `topics` is given back instead.
+  ```
+  [chan topics]
+  (def taken @[(ev/take chan)])
+  (while (pos? (ev/count chan)) (array/push taken (ev/take chan)))
+  (cond
+    (index-of nil taken) nil
+    (index-of stage/stand-down taken) [stage/stand-down]
+    (>= (length taken) (dec (ev/capacity chan)))
+    (filter |(not= stage/stand-down $) topics)
+    (distinct taken)))
+
 (defn view/stream
-  "Owns a durable subscription, waits for readiness, renders, and always cleans up."
+  "Subscribes to `topics`, waits for readiness, renders, and always unsubscribes."
   [view topics initial render &opt leaving]
   (fn [conn]
-    (def sub (subscription/open view topics stage/stand-down))
-    (var finished false)
+    (def chan (ev/chan (inc (length topics))))
+    (def gone (ev/chan 1))
     (def disconnected
       (ev/go (fn []
                (protect (:read conn 1))
-               (unless finished (subscription/close sub))
-               nil) nil (ev/chan 1)))
+               (ev/give gone :gone)
+               (ev/give chan nil)) nil (ev/chan 1)))
     (defer
-      (do (set finished true)
-          (subscription/close sub)
+      (do (produce (^notify/unsubscribe view chan))
           (protect (ev/cancel disconnected :stream-finished)))
-      (readiness/await view 10 (sub :closed-signal))
+      (produce/applied [(^notify/subscribe view chan ;topics)])
+      (readiness/await view 10 gone)
       ((http/stream
          (initial)
-         (while (def topic (subscription/take sub))
-           (if (= topic stage/stand-down)
+         (while (def taken (notify/take chan topics))
+           (if (= stage/stand-down (first taken))
              (do (when leaving (leaving)) (break))
-             (render topic)))) conn))))
+             (each topic taken (render topic))))) conn))))
 
 (defn produce/wait
-  "Waits for an applied command and its local projection, with bounded cleanup."
+  "Produces `event`, waits for it to apply and for `topic` to be sent, and returns `result`."
   [_chan topic event result]
-  (def sub (subscription/open (dyn :view) [topic]))
-  (defer (subscription/close sub)
-    (produce/applied [event])
-    (ev/with-deadline 8 (subscription/take sub))
+  (def view (dyn :view))
+  (def chan (ev/chan 2))
+  (defer (produce (^notify/unsubscribe view chan))
+    (produce/applied [(^notify/subscribe view chan topic) event])
+    (ev/with-deadline 8 (ev/take chan))
     result))

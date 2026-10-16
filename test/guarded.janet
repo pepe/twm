@@ -137,9 +137,11 @@
   (as-symbiont view |(stop nil)))
 
 (let [view @{:name "pepe"}
-      sub (subscription/open view [:todos stage/stand-down] stage/stand-down)
-      [answer events] (stopping +:stop/guarded view)
-      said (names events)]
+      chan (ev/chan 3)]
+  (:transact (make-manager @{:view view})
+             (^notify/subscribe view chan :todos stage/stand-down))
+  (def [answer events] (stopping +:stop/guarded view))
+  (def said (names events))
   (assert (= :ok answer) "the demiurge is answered")
   (assert (< (index-of "send notify stage/stand-down" said)
              (index-of "stand down after stage responses" said))
@@ -147,9 +149,8 @@
   (assert (not (index-of "save session" said)) "the session outlives it")
   (:transact (make-manager @{:view view})
              (named events "send notify stage/stand-down"))
-  (assert (= stage/stand-down (subscription/take sub))
-          "and a live stream hears it")
-  (subscription/close sub))
+  (assert (= stage/stand-down (ev/take chan))
+          "and a live stream hears it"))
 
 (let [view @{:name "pepe" :cap/session session}
       [answer events] (stopping (stop/guarded :end-session true) view)
@@ -181,20 +182,23 @@
 (def slack 0.05)
 
 (let [view @{}
-      sub (subscription/open view [stage/stand-down] stage/stand-down)]
-  (ev/spawn (ev/sleep 0.2) (subscription/close sub))
+      chan (ev/chan 2)
+      manager (make-manager @{:view view})]
+  (:transact manager (^notify/subscribe view chan stage/stand-down))
+  (ev/spawn (ev/sleep 0.2) (:transact manager (^notify/unsubscribe view chan)))
   (def [events took] (standing-down view))
   (assert (deep= @["StandDown"] (names events)) "it stands down")
   (assert (< (- 0.2 slack) took (- stand-down/patience slack))
           "once its live streams have finished their leaving"))
 
 (let [view @{}
-      sub (subscription/open view [stage/stand-down] stage/stand-down)]
+      chan (ev/chan 2)]
+  (:transact (make-manager @{:view view})
+             (^notify/subscribe view chan stage/stand-down))
   (def [events took] (standing-down view))
   (assert (deep= @["StandDown"] (names events)))
   (assert (< (- stand-down/patience slack) took (+ stand-down/patience 0.5))
-          "and a stream that never finishes holds it up no longer than its patience")
-  (subscription/close sub))
+          "and a stream that never finishes holds it up no longer than its patience"))
 
 (let [[events took] (standing-down @{})]
   (assert (deep= @["StandDown"] (names events)))

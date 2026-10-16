@@ -78,8 +78,6 @@ And the ones they stand on:
   revision backwards, and coalesces refreshes.
 - `twm/delivery` — coalesced delivery of invalidations to peers; the Tree
   never waits for a listener.
-- `twm/subscription` — durable, coalescing subscriptions for live
-  transports.
 - `twm/readiness` — the readiness gate a place opens once its projection
   is installed. It describes readiness, not authentication.
 - `twm/handover` — the browser-side waiter that follows a place through a

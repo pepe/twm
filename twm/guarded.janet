@@ -114,7 +114,10 @@
   (make-watch
     (fn [_ {:view view} _]
       (producer
-        (protect (subscription/drain view stage/stand-down stand-down/patience))
+        # A stream unsubscribes once it has said its leaving.
+        (protect (ev/with-deadline stand-down/patience
+                   (until (empty? (get-in view [:notify stage/stand-down] []))
+                     (ev/sleep 0.005))))
         (produce StandDown)))
     "stand down after stage responses"))
 
