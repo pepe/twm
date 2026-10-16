@@ -62,12 +62,3 @@
 (assert (= 7 (get-in unchanged [:view :lifetimes :absent-test-peer :generation])))
 (assert (= :failed (get (first (values (get-in unchanged [:view :operations]))) :status)))
 (end-suite)
-
-(start-suite :unknown-outcome-keeps-admission-closed)
-(:transact manager
-  (make-watch (producer (operation/submit :ambiguous
-    (fn [&] (error {:status :unknown :failure "lost completion"}))))))
-(:await manager)
-(assert (get-in state [:view :operation]))
-(assert (= :unknown (get (operation/status (state :view) (get-in state [:view :operation])) :status)))
-(end-suite)

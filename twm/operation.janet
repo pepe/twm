@@ -10,7 +10,7 @@
   "Names a synchronous event step and waits for application, including failures."
   [record phase events]
   (put record :phase phase)
-  (produce/applied events 3600))
+  (produce/applied events))
 
 (defn ^start
   "Reserves the single maintenance slot and records the eventual outcome of work."
@@ -31,19 +31,14 @@
        (producer
          (put record :status :running)
          (def [ok result] (protect (work state record)))
-         (put record :status
-              (if ok :completed
-                (if (and (dictionary? result) (= :unknown (result :status))) :unknown :failed)))
+         (put record :status (if ok :completed :failed))
          (put record :finished-at (os/time))
          (unless ok
            (put record :failure (string/format "%j" result))
            (eprin (string "Operation " (record :id) " " (record :kind)
                           " failed at " (record :phase) ": " (record :failure) "\n")))
-         # An ambiguous timed-out mutation may still be executing. Do not
-         # admit a conflicting operation on top of it.
-         (unless (= :unknown (record :status))
-           (put (state :view) :operation nil)
-           (put (state :view) :releasing false))))}
+         (put (state :view) :operation nil)
+         (put (state :view) :releasing false)))}
     "maintenance operation"))
 
 (defn submit
