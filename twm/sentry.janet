@@ -429,12 +429,19 @@
 
   Built per request rather than held as a constant, because where it posts
   depends on which door is asking.
+
+  The secret takes focus whenever the form arrives, because typing it is
+  the only thing to do here. `autofocus` would not do: the form is patched
+  into a document that is already loaded, and a document honours
+  `autofocus` once at most, so after a refused secret or a logout the
+  form would come back without focus. Datastar's `data-init` runs on
+  every patch.
   ```
   []
   [:form {:id "gate" :class "f-col center"
           :data-signals "{secret:''}"
           :data-on:submit__prevent (string "@post('" (place/url "/") "')")}
-   [:input {:type "password" :data-bind "secret"}]
+   [:input {:type "password" :data-bind "secret" :data-init "el.focus()"}]
    [:button [:strong "Use"]]])
 
 (defn- content/into-stage
