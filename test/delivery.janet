@@ -38,3 +38,26 @@
 (assert (not (get-in lonely [:delivery :gone :running]))
         "and nothing is left running for it")
 (end-suite)
+
+(start-suite :failed-notice-is-dropped)
+# The line a notice goes over is the one the peer's registration opened;
+# a retry over it could only fail again.
+(def tries @[])
+(def deaf-said @"")
+(def deaf @{:view @{} :log true
+            :listener @{:stream true :refresh (fn [_ topic]
+                                              (array/push tries topic)
+                                              (error "RPC connection closed"))}})
+(def deaf-manager (make-manager deaf))
+(def deaf-err (dyn :err))
+(setdyn :err deaf-said)
+(:transact deaf-manager (delivery/^invalidate :listener :todos))
+(:await deaf-manager)
+(setdyn :err deaf-err)
+(assert (deep= @[:todos] tries) "a notice that fails is tried once")
+(assert (string/find "Projection delivery to listener dropped todos: not answered"
+                     (string deaf-said))
+        "and dropped aloud")
+(assert (not (get-in deaf [:delivery :listener :running])))
+(assert (empty? (get-in deaf [:delivery :listener :pending])))
+(end-suite)

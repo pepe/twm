@@ -10,22 +10,36 @@
     "projection ready"))
 
 (defn install
-  "Atomically installs a snapshot's fields; revisions never move backwards."
-  [view {:epoch epoch :revision revision :values values} &opt prepare]
-  (assert (and epoch (number? revision) (dictionary? values)) "Invalid Tree snapshot")
+  ```
+  Installs a snapshot's values in `view` all at once, prepared by
+  `prepare` when given: a preparation that fails leaves the view as it
+  was.
+
+  The newest snapshot is always the last installed. A symbiont has one
+  in flight at a time, and every refresh asked for while it is out waits
+  for the next, so they are taken, and arrive, in order.
+  ```
+  [view {:values values} &opt prepare]
+  (assert (dictionary? values) "Invalid Tree snapshot")
   (def draft (merge @{} view))
-  (def revisions (if (= epoch (view :projection/epoch))
-                   (merge @{} (get view :projection/revisions {})) @{}))
-  (put draft :projection/revisions revisions)
-  (put draft :projection/epoch epoch)
-  (each [coll value] (pairs values)
-    (when (>= revision (get revisions coll -1))
-      (put draft coll value)
-      (put revisions coll revision)))
+  (merge-into draft values)
   (when prepare (prepare draft))
-  (put draft :projection/error nil)
   (merge-into view draft)
+  # Cleared on the view itself: a nil put takes the key out of the draft,
+  # and a key that is not there is not merged.
+  (put view :projection/error nil)
   view)
+
+(defn- ^unready/failed
+  "Settles every view not yet shown as failed, so no first paint waits on it."
+  [failure]
+  (make-effect
+    (fn [_ state _]
+      (each space (spaces state)
+        (when-let [view (space :view)]
+          (unless (get (readiness/status view) :ready)
+            (readiness/settle view :failed failure)))))
+    "fail unready projection"))
 
 (defn- ^pump []
   (var batch nil)
@@ -42,6 +56,22 @@
            (put requested coll true)))
        (def colls (keys requested))
        (def tree (state :tree))
+       (if (nil? (get tree :stream))
+         # A symbiont whose line to the Tree is closed is standing down:
+         # its goodbye closed it. What it was asked to refresh would be
+         # shown to nobody -- a logout's own session notice reaches the
+         # dashboard that is leaving -- so it is let go, and not reported
+         # as a projection that failed. Nothing opens the line again, so a
+         # line that broke any other way has said so once already, with
+         # the fetch that broke it; every later fetch would only say it
+         # again.
+         (make-event
+           {:update
+            (fn [_ state]
+              (put state :projection/pending @[])
+              (put state :projection/running false))
+            :watch [(^unready/failed "RPC connection closed")]}
+           "let Tree projection go")
        (producer
          (def [ok answer]
            # The owner says whose session `:cap/session` should be. A tree
@@ -61,7 +91,9 @@
                          (install (merge @{} (space :view)) answer
                                   (space :projection/prepare))])))
                   (if accepted
-                    (do (each [view draft] drafts (merge-into view draft))
+                    (do (each [view draft] drafts
+                          (merge-into view draft)
+                          (put view :projection/error nil))
                         (set applied true))
                     (set failure drafts)))
                 (unless applied
@@ -75,15 +107,10 @@
                     [;(map ^notify/send colls)
                      ;(flatten (map |(get $ :after []) batch))]
                     [(log "Tree projection failed: " failure)
-                     (make-effect
-                       (fn [_ state _]
-                         (each space (spaces state)
-                           (when-let [view (space :view)]
-                             (unless (get (readiness/status view) :ready)
-                               (readiness/settle view :failed failure))))))
+                     (^unready/failed failure)
                      ;(if-let [failed (state :projection/failed)] [failed] [])])
                  ;(if (state :projection/running) [(^pump)] [])])}
-             "install Tree projection"))))}
+             "install Tree projection")))))}
     "fetch Tree projection"))
 
 (defn ^refresh

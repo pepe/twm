@@ -74,8 +74,8 @@ And the ones they stand on:
   configuration.
 - `twm/lifecycle` — serializable peer intent and generation identity.
   Process handles stay with the Demiurge's observer.
-- `twm/projection` — installs Tree snapshots atomically, never moving a
-  revision backwards, and coalesces refreshes.
+- `twm/projection` — installs Tree snapshots atomically, one in flight at
+  a time, and coalesces refreshes.
 - `twm/delivery` — coalesced delivery of invalidations to peers; the Tree
   never waits for a listener.
 - `twm/readiness` — the readiness gate a place opens once its projection

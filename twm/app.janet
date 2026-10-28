@@ -122,9 +122,7 @@ dynamics as set by *rpc-defines*.```
   one write.
   ```
   [_ state]
-  (put state :dirty true)
-  (when-let [view (state :view)]
-    (put view :projection/revision (inc (get view :projection/revision 0)))))
+  (put state :dirty true))
 
 (define-event Flush
   ```

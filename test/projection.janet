@@ -4,14 +4,19 @@
 
 (start-suite :atomic-projection)
 (def view @{:notify @{} :focused false})
-(projection/install view {:epoch "a" :revision 2 :values {:focused :new}})
-(projection/install view {:epoch "a" :revision 1 :values {:focused :old :tracking true}})
-(assert (= :new (view :focused)) "late data cannot undo a newer field")
-(assert (view :tracking) "an older snapshot may supply an unseen field")
+(projection/install view {:values {:focused :new :tracking true}})
+(assert (= :new (view :focused)) "a snapshot's values are installed")
+(put view :projection/error "offline")
+(projection/install view {:values {:focused :newer}})
+(assert (= :newer (view :focused)) "the last snapshot installed is what shows")
+(assert (nil? (view :projection/error)) "a snapshot installed clears the error")
+(assert (view :tracking) "a field the snapshot did not carry stays")
 (assert-error "preparation failure is atomic"
-  (projection/install view {:epoch "a" :revision 3 :values {:focused :bad}}
+  (projection/install view {:values {:focused :bad}}
                       (fn [&] (error "prepare failed"))))
-(assert (= :new (view :focused)))
+(assert (= :newer (view :focused)))
+(assert-error "a snapshot without values is refused"
+  (projection/install view {:epoch "a" :revision 1}))
 (end-suite)
 
 (start-suite :asynchronous-coalescing)
@@ -20,8 +25,7 @@
          :tree @{:stream true :snapshot (fn [_ colls owner]
                             (array/push calls [colls owner])
                             (ev/sleep 0.05)
-                            {:epoch "a" :revision 1
-                             :values (tabseq [coll :in colls] coll true)})}})
+                            {:values (tabseq [coll :in colls] coll true)})}})
 (def manager (make-manager s))
 (:transact manager ;(seq [_ :range [0 20]] (projection/^refresh [:focused])))
 (assert (not (get-in s [:view :focused])) "state manager returns before the network does")
@@ -36,6 +40,12 @@
 (:await manager)
 (assert (= "offline" (get-in s [:view :projection/error])))
 (assert (not (s :projection/running)) "failure releases the in-flight slot")
+(put (s :tree) :snapshot (fn [_ colls _] {:values (tabseq [coll :in colls] coll :back)}))
+(:transact manager (projection/^refresh [:focused]))
+(:await manager)
+(assert (= :back (get-in s [:view :focused])))
+(assert (nil? (get-in s [:view :projection/error]))
+        "the next snapshot installed clears the failure")
 (end-suite)
 
 (start-suite :session-owner)
@@ -49,11 +59,37 @@
 (def g @{:name :place :guarded-by :door :view @{:notify @{}}
          :tree @{:stream true :snapshot (fn [_ colls owner]
                             (array/push guarded-calls owner)
-                            {:epoch "a" :revision 1
-                             :values (tabseq [coll :in colls] coll true)})}})
+                            {:values (tabseq [coll :in colls] coll true)})}})
 (def guarded-manager (make-manager g))
 (:transact guarded-manager (projection/^refresh [:cap/session]))
 (:await guarded-manager)
 (assert (deep= @[:door] guarded-calls)
         "a guarded symbiont asks for its guardian's session")
+(end-suite)
+
+(start-suite :leaving-symbiont)
+# The goodbye closes the line to the Tree. A refresh asked for after it is
+# let go without a word, and nothing is left waiting on it.
+(def leaving-calls @[])
+(def leaving-said @"")
+(def leaving
+  @{:name :leaving :log true :view @{:notify @{}}
+    :projection/failed (make-update (fn [_ s] (put s :failed-hook true)))
+    :tree @{:stream nil :snapshot (fn [&] (array/push leaving-calls true)
+                                    (error "RPC connection closed"))}})
+(def leaving-manager (make-manager leaving))
+(def leaving-err (dyn :err))
+(setdyn :err leaving-said)
+(:transact leaving-manager (projection/^refresh [:cap/session]))
+(:await leaving-manager)
+(setdyn :err leaving-err)
+(assert (empty? leaving-calls) "a closed line is not asked")
+(assert (not (string/find "Tree projection failed" (string leaving-said)))
+        "and its refresh is not reported as failed")
+(assert (not (leaving :failed-hook)) "nor runs the failure hook")
+(assert (nil? (get-in leaving [:view :projection/error])))
+(assert (not (leaving :projection/running)) "nothing is left running")
+(assert (empty? (leaving :projection/pending)))
+(assert (= :failed ((readiness/status (leaving :view)) :status))
+        "a first paint still waiting is told it will not come")
 (end-suite)
