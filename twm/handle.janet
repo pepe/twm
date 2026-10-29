@@ -233,19 +233,61 @@
 (defn- quit [state]
   ((state :leave) (state :term) 0))
 
+(defn- ^completions
+  ```
+  Asks the app how `text` could be completed, and completes the line to
+  the first answer when it still says `text`; the others wait for the
+  next Tab.
+  ```
+  [text]
+  (make-watch
+    (fn [_ state _]
+      (when-let [complete (get-in state [:app :complete])]
+        (def view (state :view))
+        (producer
+          (def [ok texts]
+            (protect (complete (commands state) view text)))
+          (if (and ok (present? texts))
+            (produce
+              (make-event
+                {:update
+                 (fn [_ state]
+                   (def ed (state :editor))
+                   (when (= text (tui/editor/text ed))
+                     (put state :cycle @{:texts texts :i 0})
+                     (tui/editor/set ed (first texts))))
+                 :watch [(^explain)]
+                 :effect (fn [_ state _] (render state))}
+                "handle completed"))
+            (if-not ok (put state :commands nil))))))
+    "handle complete"))
+
 (defn- ^key [k]
   (def key (k :key))
   (var submitted nil)
   (var changed false)
+  (var completing nil)
   (make-event
     {:update
      (fn [_ state]
        (def [rows cols] (tui/size))
        (def page (max 1 (- rows 10)))
        (def ed (state :editor))
+       (def cycle (state :cycle))
+       (unless (= key :tab) (put state :cycle nil))
        (cond
          (= key :ctrl-c) (quit state)
          (= key :wheel) (update state :scroll + (* 3 (k :dy)))
+         (and (state :input?) (= key :tab))
+         # Tab completes as the clouds of the dashboard do; again, it goes
+         # on to the next completion, Shift+Tab back to the one before.
+         (if cycle
+           (let [n (length (cycle :texts))
+                 i (% (+ (cycle :i) (if (k :shift) (dec n) 1)) n)]
+             (put cycle :i i)
+             (tui/editor/set ed ((cycle :texts) i))
+             (set changed true))
+           (set completing (tui/editor/text ed)))
          (state :input?)
          (if (= key :esc)
            (put state :input? false)
@@ -266,6 +308,7 @@
      :watch (fn [&]
               (cond
                 submitted [(^submit ;submitted) (^explain)]
+                completing (^completions completing)
                 changed (^explain)))
      :effect (fn [_ state _] (render state))}
     "handle key"))
@@ -287,13 +330,16 @@
     `text` would do, asked once typing stands still a moment,
   * `:submit` -- `(fn [client view text advance])` doing it over
     `client` and returning the message to show; `advance` when Shift was
-    held.
+    held,
+  * `:complete` -- `(fn [client view text])` returning the texts the line
+    `text` could be completed to, for Tab.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
   gp/tui draws them.
 
-  Ctrl+Enter or Alt+Enter submits, Enter breaks the line, Esc leaves it
-  and `i` comes back. Outside it j/k, arrows, PgUp/PgDn and the wheel
+  Ctrl+Enter or Alt+Enter submits, Enter breaks the line, Tab completes
+  and Tab again goes on to the next completion, Esc leaves the line and
+  `i` comes back. Outside it j/k, arrows, PgUp/PgDn and the wheel
   scroll, q quits; Ctrl+C quits anywhere.
   ```
   [config app]
