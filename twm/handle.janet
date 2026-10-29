@@ -216,11 +216,15 @@
       (nil? line) ""
       (bytes? line) ["  " (tui/styled style line)]
       ["  " ;(if (indexed? line) line [line])]))
+  (defn lines-of [said style]
+    (if (and (dictionary? said) (said :lines))
+      (map |(indented $ style) (said :lines))
+      [(indented said style)]))
   (def laid
     (tui/stack
       rows
       live
-      [(indented (state :explanation) :dim)
+      [;(lines-of (state :explanation) :dim)
        (if (state :online)
          (indented (state :message) :cyan)
          (indented (string "offline" (if-let [f (state :failure)] (string ": " f) ""))
@@ -335,7 +339,7 @@
     `text` could be completed to, for Tab.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
-  gp/tui draws them.
+  gp/tui draws them. `:explain` can give more lines as `{:lines lines}`.
 
   Ctrl+Enter or Alt+Enter submits, Enter breaks the line, Tab completes
   and Tab again goes on to the next completion, Esc leaves the line and
