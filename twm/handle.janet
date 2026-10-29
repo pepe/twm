@@ -239,15 +239,34 @@
       (protect (:close client))
       (ev/sleep 2))))
 
-(defn- ^submit [text advance]
+(def- message/beat
+  "Seconds each line of a message shows before the next one."
+  0.5)
+
+(defn- ^submit
+  ```
+  Submits `text` and shows the message it answers with. The lines of a
+  message of more lines show one after another, the last one staying; a
+  later message cuts them short.
+  ```
+  [text advance]
   (make-watch
     (fn [_ state _]
       (def {:app app :view view} state)
       (producer
+        (def n (inc (get state :message/n 0)))
+        (put state :message/n n)
         (def message
           (try ((app :submit) (commands state) view text advance)
             ([err] (put state :commands nil) (string "Error: " err))))
-        (produce (^message message))))
+        (def said
+          (cond
+            (not (and (dictionary? message) (message :lines))) [message]
+            (empty? (message :lines)) [nil]
+            (message :lines)))
+        (eachp [i line] said
+          (if (pos? i) (ev/sleep message/beat))
+          (if (= n (state :message/n)) (produce (^message line))))))
     "handle submit"))
 
 (defn- quit [state]
@@ -337,7 +356,8 @@
     `text` would do, asked once typing stands still a moment,
   * `:submit` -- `(fn [client view text advance])` doing it over
     `client` and returning the message to show; `advance` when Shift was
-    held.
+    held. A message of more lines, `{:lines lines}`, shows them one after
+    another, half a second each.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
   gp/tui draws them. `:explain` can give more lines as `{:lines lines}`,
