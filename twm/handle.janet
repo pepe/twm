@@ -146,12 +146,15 @@
          (producer
            (ev/sleep explain/quiet)
            (when (= n (state :explain/n))
+             (def text (tui/editor/text (state :editor)))
              (def line
-               (try (explain (commands state) (state :view)
-                             (tui/editor/text (state :editor)))
+               (try (explain (commands state) (state :view) text)
                  ([err] (put state :commands nil) (tui/styled :red (string err)))))
              (if (= n (state :explain/n))
-               (produce (make-update (fn [_ state] (put state :explanation line))
+               (produce (make-update (fn [_ state]
+                                       (put state :explanation line)
+                                       (put state :explained text)
+                                       (put state :choice nil))
                                      "handle explanation")))))))}
     "handle explain"))
 
@@ -216,9 +219,14 @@
       (nil? line) ""
       (bytes? line) ["  " (tui/styled style line)]
       ["  " ;(if (indexed? line) line [line])]))
+  (defn picked [piece]
+    (tui/styled [:reverse :yellow :bold] (if (dictionary? piece) (piece :text) piece)))
   (defn lines-of [said style]
     (if (and (dictionary? said) (said :lines))
-      (map |(indented $ style) (said :lines))
+      (let [[r c] (if-let [i (state :choice)] (get-in said [:choices i :at]) [])]
+        (seq [[i line] :pairs (said :lines)]
+          (indented (if (= i r) (put (array ;line) c (picked (line c))) line)
+                    style)))
       [(indented said style)]))
   (def laid
     (tui/stack
@@ -237,68 +245,58 @@
 (defn- quit [state]
   ((state :leave) (state :term) 0))
 
-(defn- ^completions
+(defn- choices
   ```
-  Asks the app how `text` could be completed, and completes the line to
-  the first answer when it still says `text`; the others wait for the
-  next Tab.
+  The choices the cloud of the explanation offers, when it explains the
+  line as it stands.
   ```
-  [text]
-  (make-watch
-    (fn [_ state _]
-      (when-let [complete (get-in state [:app :complete])]
-        (def view (state :view))
-        (producer
-          (def [ok texts]
-            (protect (complete (commands state) view text)))
-          (if (and ok (present? texts))
-            (produce
-              (make-event
-                {:update
-                 (fn [_ state]
-                   (def ed (state :editor))
-                   (when (= text (tui/editor/text ed))
-                     (put state :cycle @{:texts texts :i 0})
-                     (tui/editor/set ed (first texts))))
-                 :watch [(^explain)]
-                 :effect (fn [_ state _] (render state))}
-                "handle completed"))
-            (if-not ok (put state :commands nil))))))
-    "handle complete"))
+  [state]
+  (def said (state :explanation))
+  (def offered (and (dictionary? said) (said :choices)))
+  (if (and (present? offered)
+           (= (state :explained) (tui/editor/text (state :editor))))
+    offered))
 
 (defn- ^key [k]
   (def key (k :key))
   (var submitted nil)
   (var changed false)
-  (var completing nil)
   (make-event
     {:update
      (fn [_ state]
        (def [rows cols] (tui/size))
        (def page (max 1 (- rows 10)))
        (def ed (state :editor))
-       (def cycle (state :cycle))
-       (unless (= key :tab) (put state :cycle nil))
+       (def choice (state :choice))
        (cond
          (= key :ctrl-c) (quit state)
          (= key :wheel) (update state :scroll + (* 3 (k :dy)))
          (and (state :input?) (= key :tab))
-         # Tab completes as the clouds of the dashboard do; again, it goes
-         # on to the next completion, Shift+Tab back to the one before.
-         (if cycle
-           (let [n (length (cycle :texts))
-                 i (% (+ (cycle :i) (if (k :shift) (dec n) 1)) n)]
-             (put cycle :i i)
-             (tui/editor/set ed ((cycle :texts) i))
-             (set changed true))
-           (set completing (tui/editor/text ed)))
+         # Tab picks a button of the cloud, Tab again the next one and
+         # Shift+Tab the one before; the line is left as it is.
+         (when-let [offered (choices state)]
+           (def n (length offered))
+           (put state :choice
+                (cond
+                  choice (% (+ choice (if (k :shift) (dec n) 1)) n)
+                  (k :shift) (dec n)
+                  0)))
+         (and choice (or (= key :enter) (= " " (k :text))))
+         # Space or Enter takes the picked one into the line, as a click.
+         (do
+           (tui/editor/set ed (get-in state [:explanation :choices choice :text]))
+           (put state :choice nil)
+           (set changed true))
+         (and choice (= key :esc)) (put state :choice nil)
          (state :input?)
-         (if (= key :esc)
-           (put state :input? false)
-           (case (tui/editor/key ed k cols)
-             :submit (do (set submitted [(tui/editor/text ed) (truthy? (k :shift))])
-                       (tui/editor/submit ed))
-             :changed (set changed true)))
+         (do
+           (put state :choice nil)
+           (if (= key :esc)
+             (put state :input? false)
+             (case (tui/editor/key ed k cols)
+               :submit (do (set submitted [(tui/editor/text ed) (truthy? (k :shift))])
+                         (tui/editor/submit ed))
+               :changed (set changed true))))
          (case [key (k :text)]
            [:char "q"] (quit state)
            [:char "i"] (put state :input? true)
@@ -312,7 +310,6 @@
      :watch (fn [&]
               (cond
                 submitted [(^submit ;submitted) (^explain)]
-                completing (^completions completing)
                 changed (^explain)))
      :effect (fn [_ state _] (render state))}
     "handle key"))
@@ -334,16 +331,18 @@
     `text` would do, asked once typing stands still a moment,
   * `:submit` -- `(fn [client view text advance])` doing it over
     `client` and returning the message to show; `advance` when Shift was
-    held,
-  * `:complete` -- `(fn [client view text])` returning the texts the line
-    `text` could be completed to, for Tab.
+    held.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
-  gp/tui draws them. `:explain` can give more lines as `{:lines lines}`.
+  gp/tui draws them. `:explain` can give more lines as `{:lines lines}`,
+  and with them `:choices`, each `{:text text :at [row col]}`: the line
+  `text` that the piece `col` of the line `row` leaves, as a button of
+  the cloud does.
 
-  Ctrl+Enter or Alt+Enter submits, Enter breaks the line, Tab completes
-  and Tab again goes on to the next completion, Esc leaves the line and
-  `i` comes back. Outside it j/k, arrows, PgUp/PgDn and the wheel
+  Ctrl+Enter or Alt+Enter submits, Enter breaks the line. Tab picks one
+  of the choices and Tab again the next, Space or Enter takes the picked
+  one into the line, Esc lets it go. Esc leaves the line and `i` comes
+  back. Outside it j/k, arrows, PgUp/PgDn and the wheel
   scroll, q quits; Ctrl+C quits anywhere.
   ```
   [config app]
