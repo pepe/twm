@@ -12,4 +12,5 @@
 (assert-docs "../twm/sentry")
 (assert-docs "../twm/guarded")
 (assert-docs "../twm/demiurge")
+(assert-docs "../twm/handle")
 (end-suite)
