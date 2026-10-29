@@ -109,8 +109,50 @@
   (defer (:close client)
     (pp (apply (keyword cmd) client args))))
 
+(defn- render [state]
+  (def {:term term :app app :view view :editor ed} state)
+  (def [rows cols] (tui/size))
+  (def [live cursor] (tui/editor/render ed cols))
+  (def blocks ((get app :render (fn [&] [])) view cols))
+  (each b blocks
+    (if (table? b) (put b :scroll (state :scroll))))
+  (defn indented [line style]
+    (cond
+      (nil? line) ""
+      (bytes? line) ["  " (tui/styled style line)]
+      ["  " ;(if (indexed? line) line [line])]))
+  (defn picked [piece]
+    (tui/styled [:reverse :yellow :bold] (if (dictionary? piece) (piece :text) piece)))
+  (defn lines-of [said style]
+    (if (and (dictionary? said) (said :lines))
+      (let [[r c] (if-let [i (state :choice)] (get-in said [:choices i :at]) [])]
+        (seq [[i line] :pairs (said :lines)]
+          (indented (if (= i r) (put (array ;line) c (picked (line c))) line)
+                    style)))
+      [(indented said style)]))
+  (def laid
+    (tui/stack
+      rows
+      live
+      [;(lines-of (state :explanation) :dim)
+       (if (state :online)
+         (indented (state :message) :cyan)
+         (indented (string "offline" (if-let [f (state :failure)] (string ": " f) ""))
+                   :red))]
+      (tui/rule cols)
+      ;blocks))
+  (put state :scroll (laid :scroll))
+  (tui/present term (laid :lines) (if (state :input?) cursor)))
+
+(def- Render (make-effect (fn [_ state _] (render state)) "handle render"))
+
+(defn- drawn
+  "The event of `update` named `name`, the screen drawn again after it."
+  [update name]
+  (make-event {:update update :effect (fn [_ state _] (render state))} name))
+
 (defn- ^status [online &opt failure]
-  (make-update
+  (drawn
     (fn [_ state]
       (put state :online online)
       (put state :failure failure))
@@ -151,22 +193,23 @@
                (try (explain (commands state) (state :view) text)
                  ([err] (put state :commands nil) (tui/styled :red (string err)))))
              (if (= n (state :explain/n))
-               (produce (make-update (fn [_ state]
-                                       (put state :explanation line)
-                                       (put state :explained text)
-                                       (put state :choice nil))
-                                     "handle explanation")))))))}
+               (produce (drawn (fn [_ state]
+                                 (put state :explanation line)
+                                 (put state :explained text)
+                                 (put state :choice nil))
+                               "handle explanation")))))))}
     "handle explain"))
 
 (defn- ^view [values]
   (make-event
     {:update (fn [_ state] (merge-into (state :view) values))
      # What the line would do depends on the view as well as on the line.
-     :watch [(^explain)]}
+     :watch [(^explain)]
+     :effect (fn [_ state _] (render state))}
     "handle view"))
 
 (defn- ^message [message]
-  (make-update
+  (drawn
     (fn [_ state] (put state :message message))
     "handle message"))
 
@@ -206,41 +249,6 @@
             ([err] (put state :commands nil) (string "Error: " err))))
         (produce (^message message))))
     "handle submit"))
-
-(defn- render [state]
-  (def {:term term :app app :view view :editor ed} state)
-  (def [rows cols] (tui/size))
-  (def [live cursor] (tui/editor/render ed cols))
-  (def blocks ((get app :render (fn [&] [])) view cols))
-  (each b blocks
-    (if (table? b) (put b :scroll (state :scroll))))
-  (defn indented [line style]
-    (cond
-      (nil? line) ""
-      (bytes? line) ["  " (tui/styled style line)]
-      ["  " ;(if (indexed? line) line [line])]))
-  (defn picked [piece]
-    (tui/styled [:reverse :yellow :bold] (if (dictionary? piece) (piece :text) piece)))
-  (defn lines-of [said style]
-    (if (and (dictionary? said) (said :lines))
-      (let [[r c] (if-let [i (state :choice)] (get-in said [:choices i :at]) [])]
-        (seq [[i line] :pairs (said :lines)]
-          (indented (if (= i r) (put (array ;line) c (picked (line c))) line)
-                    style)))
-      [(indented said style)]))
-  (def laid
-    (tui/stack
-      rows
-      live
-      [;(lines-of (state :explanation) :dim)
-       (if (state :online)
-         (indented (state :message) :cyan)
-         (indented (string "offline" (if-let [f (state :failure)] (string ": " f) ""))
-                   :red))]
-      (tui/rule cols)
-      ;blocks))
-  (put state :scroll (laid :scroll))
-  (tui/present term (laid :lines) (if (state :input?) cursor)))
 
 (defn- quit [state]
   ((state :leave) (state :term) 0))
@@ -313,8 +321,6 @@
                 changed (^explain)))
      :effect (fn [_ state _] (render state))}
     "handle key"))
-
-(def- Render (make-effect (fn [_ state _] (render state)) "handle render"))
 
 (defn session
   ```
