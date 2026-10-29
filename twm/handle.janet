@@ -241,7 +241,7 @@
 
 (def- message/beat
   "Seconds each line of a message shows before the next one."
-  0.5)
+  1)
 
 (defn- ^submit
   ```
@@ -357,7 +357,7 @@
   * `:submit` -- `(fn [client view text advance])` doing it over
     `client` and returning the message to show; `advance` when Shift was
     held. A message of more lines, `{:lines lines}`, shows them one after
-    another, half a second each.
+    another, a second each.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
   gp/tui draws them. `:explain` can give more lines as `{:lines lines}`,
