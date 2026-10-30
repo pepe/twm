@@ -1,6 +1,7 @@
 (use spork/test)
 (import ../twm/thicket :prefix "")
 (import ../twm/handle)
+(import gp/tui)
 
 (def psk (string/repeat "k" 32))
 (def url "localhost:45871")
@@ -50,6 +51,35 @@
 (def new (:handle/watch client [:state]))
 (assert (nil? (get-in view [:handle/watches old])) "a watch long unawaited lapses")
 (assert (get-in view [:handle/watches new]) "the new one stays")
+(end-suite)
+
+(start-suite :handle-quick)
+(def- key-event (get-in (require "../twm/handle") ['^key :value]))
+(defn- press
+  "Presses `keys` on `state`, and returns what the last one watches."
+  [state & keys]
+  (var watched nil)
+  (each k keys
+    (def e (key-event k))
+    ((e :update) e state)
+    (set watched ((e :watch) e state nil)))
+  watched)
+(defn- line [state] (tui/editor/text (state :editor)))
+(def state @{:app {:quick {"b" "/b"}} :input? false
+             :editor (tui/make-editor {:prompt "> "})})
+(press state {:key :char :text "b"} {:key :char :text "3"})
+(assert (and (state :input?) (= "/b3" (line state)))
+        "a quick key begins its line, typed on")
+(assert (indexed? (press state {:key :enter}))
+        "Enter alone submits it")
+(assert (and (not (state :input?)) (= "" (line state)))
+        "and the line is left, empty")
+(press state {:key :char :text "b"} {:key :esc})
+(assert (and (not (state :input?)) (= "" (line state)))
+        "Esc takes a quick line away")
+(press state {:key :char :text "i"} {:key :char :text "x"} {:key :enter})
+(assert (and (state :input?) (= "x\n" (line state)))
+        "a line not begun by a quick key breaks on Enter")
 (end-suite)
 
 (os/exit 0)

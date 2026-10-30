@@ -284,6 +284,12 @@
            (= (state :explained) (tui/editor/text (state :editor))))
     offered))
 
+(defn- leave-quick
+  "Leaves the line a quick key began."
+  [state]
+  (put state :input? false)
+  (put state :quick nil))
+
 (defn- ^key [k]
   (def key (k :key))
   (var submitted nil)
@@ -318,12 +324,25 @@
          (state :input?)
          (do
            (put state :choice nil)
-           (if (= key :esc)
-             (put state :input? false)
-             (case (tui/editor/key ed k cols)
+           (cond
+             # A line a quick key began is the key's: Esc takes it away.
+             (and (= key :esc) (state :quick))
+             (do (tui/editor/set ed "")
+               (leave-quick state)
+               (set changed true))
+             (= key :esc) (put state :input? false)
+             (case (if (and (state :quick) (= key :enter)) :submit
+                     (tui/editor/key ed k cols))
                :submit (do (set submitted [(tui/editor/text ed) (truthy? (k :shift))])
-                         (tui/editor/submit ed))
+                         (tui/editor/submit ed)
+                         (if (state :quick) (leave-quick state)))
                :changed (set changed true))))
+         (and (= key :char) (get-in state [:app :quick (k :text)]))
+         # A quick key begins its line, and Enter alone submits it.
+         (do
+           (tui/editor/set ed (get-in state [:app :quick (k :text)]))
+           (merge-into state {:input? true :quick true})
+           (set changed true))
          (case [key (k :text)]
            [:char "q"] (quit state)
            [:char "i"] (put state :input? true)
@@ -357,7 +376,10 @@
   * `:submit` -- `(fn [client view text advance])` doing it over
     `client` and returning the message to show; `advance` when Shift was
     held. A message of more lines, `{:lines lines}`, shows them one after
-    another, a second each.
+    another, a second each,
+  * `:quick` -- a table from a key's text to the line it begins outside
+    the line, ahead of the handle's own keys: with `{"b" "/b"}`, `b3`
+    and Enter submit `/b3`.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
   gp/tui draws them. `:explain` can give more lines as `{:lines lines}`,
@@ -369,7 +391,9 @@
   of the choices and Tab again the next, Space or Enter takes the picked
   one into the line, Esc lets it go. Esc leaves the line and `i` comes
   back. Outside it j/k, arrows, PgUp/PgDn and the wheel
-  scroll, q quits; Ctrl+C quits anywhere.
+  scroll, q quits; Ctrl+C quits anywhere. A key of `:quick` begins its
+  line there: Enter alone submits it, and the line is left again then,
+  or with Esc, which takes it away.
   ```
   [config app]
   # What is said on stderr while the alternate screen is up would leave
