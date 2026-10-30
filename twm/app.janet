@@ -571,6 +571,65 @@ dynamics as set by *rpc-defines*.```
           (string/format "Invalid Aether message: %p" message))
   message)
 
+(defn aether/scanner
+  ```
+  A reader of Aether envelopes from `stream` that steps over everything
+  else on it, calling `on-skip` with the count of every run of bytes it
+  stepped over.
+
+  A Demiurge reads its peers strictly: a peer is a program twm wrote, and
+  a byte on its stdout that is not a frame means the peer is wrong. A
+  subthicket's Demiurge is another matter. It builds, and a build writes
+  what it is doing to stdout -- spork's compiler steps do -- so the frames
+  it sends its parent arrive among lines nobody framed. Read strictly, the
+  first build of a release would be taken for a broken Aether, and the
+  Demiurge doing the release killed in the middle of it.
+
+  Frames are found by their magic. What looks like one and does not hold a
+  valid envelope is stepped over too. The end of the stream is reported as
+  `aether/read` reports it, so a reader cannot tell the two apart there.
+  ```
+  [stream &opt on-skip]
+  (default on-skip (fn [_]))
+  (def buf @"")
+  (def head (+ (length aether/magic) 12))
+  (defn fill []
+    (unless (:read stream 4096 buf)
+      (error "Aether stream ended before the framed message was complete")))
+  (defn drop [n]
+    (when (pos? n)
+      (on-skip n)
+      (def rest (buffer/slice buf n))
+      (buffer/clear buf)
+      (buffer/push buf rest)))
+  (defn hex? [s] (peg/match ~(* (any (set "0123456789abcdef")) -1) s))
+  (fn next []
+    (var message nil)
+    (while (nil? message)
+      (if-let [at (string/find aether/magic buf)]
+        (do
+          (drop at)
+          (while (< (length buf) head) (fill))
+          (def size (scan-number (string (buffer/slice buf (length aether/magic) head))))
+          (if (not (and size (nat? size) (even? size) (<= size aether/max-size)))
+            (drop 1)
+            (do
+              (while (< (length buf) (+ head size)) (fill))
+              (def hex (string (buffer/slice buf head (+ head size))))
+              (def [ok envelope] (if (hex? hex) (protect (unmarshal (aether/unhex hex))) [false]))
+              (if (and ok (aether/message? envelope))
+                (do
+                  (def rest (buffer/slice buf (+ head size)))
+                  (buffer/clear buf)
+                  (buffer/push buf rest)
+                  (set message envelope))
+                (drop (+ head size))))))
+        (do
+          # Keep what could still be the start of a magic split across reads.
+          (drop (max 0 (- (length buf) (dec (length aether/magic)))))
+          (fill))))
+    message))
+
 (defn ^aether
   "Writes one framed Aether envelope to stdout."
   [message]
@@ -814,10 +873,125 @@ dynamics as set by *rpc-defines*.```
   [_ {:name name} _]
   (log (human name) " is ready"))
 
+(def supervised/variable
+  ```
+  The environment variable a supervisor sets on the processes it spawns.
+
+  Only a process spawned with it watches its supervisor at all. A
+  symbiont started by hand, a Demiurge raised by a boot script and one
+  started with `nohup </dev/null` have a stdin that tells nothing about
+  any supervisor, and must go on living as they always have.
+  ```
+  "TWM_SUPERVISED")
+
+(defn supervised?
+  "Whether this process was spawned by a supervisor that it must not outlive."
+  []
+  (truthy? (os/getenv supervised/variable)))
+
+(var- supervisor/armed
+  ```
+  What `supervisor/arm` found: nil before it was asked, `:unsupervised`
+  for a process nobody supervises, else the channel given once the
+  supervisor is gone.
+  ```
+  nil)
+
+(defn supervisor/arm
+  ```
+  Starts waiting for this process's supervisor to go, when it has one,
+  and returns the channel given once it is gone, or nil.
+
+  A supervisor spawns its processes with their stdin piped from it and
+  never writes there. The pipe closes when the supervisor's process ends,
+  however it ends -- asked, crashed or killed -- so reading it to its end
+  is the one question that is answered even when nobody is left to ask
+  it. Without this, a killed Demiurge leaves every peer running, holding
+  the sockets and the store its successor's peers need, with nothing that
+  would ever stop them.
+
+  To be called when the process starts, before anything sandboxes it: a
+  sandbox may forbid reading the environment, opening the pipe and
+  starting a thread, and a symbiont's own setup is what sandboxes it.
+  twm's entry points call it first; asked again it only answers.
+
+  Outside Windows the pipe is opened again as a stream of the event loop,
+  and read there. Reading the `stdin` file instead needs a thread, and a
+  thread blocked in it holds the lock of the C library's stdin: `exit`
+  flushes every stdio stream before the process may end, waits for that
+  lock, and never gets it -- a symbiont asked to stop would stop
+  everything but its process. Windows' C library does not wait there, and
+  has no `/dev/stdin`, so the thread is kept for it.
+
+  The wait is no producer of any manager, so it never holds one: a
+  symbiont that stops for another reason exits with it still waiting.
+  ```
+  []
+  # Everything a sandbox could refuse happens here, before this returns:
+  # the fiber below runs only later, when the sandbox may be in place.
+  (when (nil? supervisor/armed)
+    (set supervisor/armed
+         (if (supervised?)
+           (let [gone (ev/chan 1)
+                 [opened stream] (if (= :windows (os/which))
+                                   [false]
+                                   (protect (os/open "/dev/stdin" :r)))
+                 read (unless opened (ev/thread-chan 1))]
+             (when read
+               (ev/thread (fn read-supervisor [] (while (file/read stdin 4096)))
+                          nil :n read))
+             (ev/go (fn watch-supervisor []
+                      (if opened
+                        (while (ev/read stream 4096))
+                        (ev/take read))
+                      (ev/give gone true))
+                    nil (ev/chan 1))
+             gone)
+           :unsupervised)))
+  (when (= :core/channel (type supervisor/armed)) supervisor/armed))
+
+(defn ^supervisor/watch
+  ```
+  Produces `leave` once the supervisor is gone, as `supervisor/arm`
+  watches for it. Nothing when nobody supervises this process.
+  ```
+  [leave]
+  (make-watch
+    (producer
+      (def [armed gone] (protect (supervisor/arm)))
+      (cond
+        (not armed)
+        (produce (log "Cannot watch the supervisor, armed too late: " gone))
+        gone
+        (do (ev/take gone)
+            (produce (log "The supervisor is gone; leaving") leave))))
+    "watch supervisor"))
+
+(define-watch SelfStop
+  ```
+  Stops a symbiont the way its supervisor would have: through its own
+  mycelium `:stop`, which each kind of symbiont answers in its own way,
+  with the store flushed and the places handed back. Exits outright only
+  when its own door does not answer.
+  ```
+  [_ state _]
+  (def {:psk psk :name name} state)
+  (def url (get-in state [:rpc :url]))
+  (producer
+    (def [ok]
+      (protect
+        (def [host port] (server/host-port url))
+        (def client (make rpc/Client :host host :port port :psk psk :name name))
+        (ev/with-deadline 5 (:open client) (:stop client))))
+    (unless ok (produce (log name " cannot ask itself to stop; exiting") Stop))))
+
 (define-watch AetherReady
-  "Logs readiness and announces it to the supervising Demiurge."
+  ```
+  Logs readiness and announces it to the supervising Demiurge, and from
+  then on leaves when that Demiurge is gone.
+  ```
   [_ _ _]
-  [Ready (^aether @{:op :ready})])
+  [Ready (^aether @{:op :ready}) (^supervisor/watch SelfStop)])
 
 (def project-files-peg
   "PEG for filewatch"

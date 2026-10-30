@@ -812,6 +812,7 @@
   outside.
   ```
   [config templates rpc-funcs start & before]
+  (supervisor/arm)
   (-> config
       (make-manager on-error)
       (:transact ;before

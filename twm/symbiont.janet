@@ -3,6 +3,7 @@
 (defn run
   "Runs a symbiont lifecycle around its project-specific setup and start events."
   [config start & before]
+  (supervisor/arm)
   (-> config
       (make-manager on-error)
       (:transact ;before
