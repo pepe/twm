@@ -102,7 +102,7 @@
    :symbionts {:demiurge {:entry "demiurge.janet" :builder false
                           :autostart [:child] :builds [:child]}
                :child {:entry "demiurge.janet" :shutdown 30
-                       :subthicket {:build-path child-dir
+                       :subthicket {:build-path child-dir :run-peers true
                                     :log (path/join child-dir "data" "demiurge.log")}}}})
 
 (defn lay-out []
@@ -216,9 +216,8 @@
   (assert (eventually |(up? (ports :parent))) "the parent rises")
   (call (ports :parent) psk/parent :run-peers)
   (assert (eventually |(up? (ports :door))) "the parent raises the child, which opens its parent's door")
-  (def door-psk (subthicket/psk psk/parent :child))
-  (call (ports :door) door-psk :run-peers)
-  (assert (eventually |(up? (ports :sleeper))) "and the child, asked through that door, raises its own peer")
+  (assert (eventually |(up? (ports :sleeper)))
+          "and the child, asked by the parent through that door, raises its own peer")
   parent)
 
 (start-suite :scanner)
@@ -318,9 +317,11 @@
         "a killed child's peer notices and leaves instead of staying behind")
 (assert (eventually |(and (up? (ports :door)) (not= first-child (pid-of (path/join child-dir "pid")))) 60)
         "and the parent raises a new child in its place")
-(def second-child (first (herd)))
+(assert (eventually |(and (up? (ports :sleeper)) (not= first-sleeper (get (herd) 1))) quick)
+        "which it asks to run its peers again, so the thicket comes back whole")
+(def second-herd (herd))
 (call (ports :parent) psk/parent :stop)
-(assert (eventually |(gone? [second-child]) quick) "and stops it as gracefully as the first")
+(assert (eventually |(gone? second-herd) quick) "and stops it as gracefully as the first")
 (os/proc-wait parent)
 (assert (not (string/find "did not exit" (parent-log))) "without killing it")
 (end-suite)

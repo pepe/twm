@@ -210,6 +210,24 @@
       (os/spawn ["/bin/sh" "-c" `cd "$1" && shift && exec "$@"` "sh" bp ;cmd]
                 :pe env))))
 
+(defn ^subthicket/run-peers
+  ```
+  Asks the subthicket `peer`, just connected, to run its own peers.
+
+  A Demiurge raises nothing of its own accord: started alone, it is asked
+  to by whoever started it. A subthicket with `:run-peers` is asked by its
+  parent each time it is ready, so one the parent raised again after it
+  died comes back whole, peers and all.
+  ```
+  [peer]
+  (make-watch
+    (fn [_ state _]
+      (def client (state peer))
+      (producer
+        (def [ok answer] (protect (:run-peers client)))
+        (produce (log "Asked " peer " to run its peers: " (if ok answer (string "failed, " answer))))))
+    (. "run peers of " peer)))
+
 (defn peer/pipe-out
   ```
   Spawns the peer process with its stdout piped, which is the Aether the
@@ -450,7 +468,10 @@
                      (match message
                        {:op :ready}
                        (produce (^peer/connect group
-                                  (^peer/save-spawned group :mycelium generation) generation))
+                                  (make-watch [(^peer/save-spawned group :mycelium generation)
+                                               ;(if (sub :run-peers) [(^subthicket/run-peers group)] [])]
+                                              (. "subthicket " group " ready"))
+                                  generation))
                        {:op op} (produce (log "Ignored Aether " op " from subthicket " group)))
                    (match message
                      {:op :ready}
