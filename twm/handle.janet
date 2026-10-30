@@ -109,6 +109,33 @@
   (defer (:close client)
     (pp (apply (keyword cmd) client args))))
 
+(defn- choices
+  ```
+  The choices the cloud of the explanation offers, when it explains the
+  line as it stands.
+  ```
+  [state]
+  (def said (state :explanation))
+  (def offered (and (dictionary? said) (said :choices)))
+  (if (and (present? offered)
+           (= (state :explained) (tui/editor/text (state :editor))))
+    offered))
+
+(defn- spans
+  ```
+  Where each choice of the cloud is drawn, for a click to find it: the
+  explanation's lines start at the screen row `top`, each indented by
+  two. Each span is `{:row :from :to :choice}`, from zero, `:to` past
+  its last column.
+  ```
+  [state top]
+  (seq [[i {:at [r c]}] :pairs (or (choices state) [])
+        :let [line (get-in state [:explanation :lines r])]
+        :when (and (indexed? line) (< c (length line)))
+        :let [from (+ 2 (sum (map tui/line-width (slice line 0 c))))]]
+    {:row (+ top r) :from from :to (+ from (tui/line-width (line c)))
+     :choice i}))
+
 (defn- render [state]
   (def {:term term :app app :view view :editor ed} state)
   (def [rows cols] (tui/size))
@@ -142,6 +169,9 @@
       (tui/rule cols)
       ;blocks))
   (put state :scroll (laid :scroll))
+  # Where things are drawn, for a click to tell what it fell on.
+  (put state :spans (spans state (length live)))
+  (put state :flex [(laid :top) (laid :height)])
   (tui/present term (laid :lines) (if (state :input?) cursor)))
 
 (def- Render (make-effect (fn [_ state _] (render state)) "handle render"))
@@ -272,18 +302,6 @@
 (defn- quit [state]
   ((state :leave) (state :term) 0))
 
-(defn- choices
-  ```
-  The choices the cloud of the explanation offers, when it explains the
-  line as it stands.
-  ```
-  [state]
-  (def said (state :explanation))
-  (def offered (and (dictionary? said) (said :choices)))
-  (if (and (present? offered)
-           (= (state :explained) (tui/editor/text (state :editor))))
-    offered))
-
 (defn- leave-quick
   "Leaves the line a quick key began."
   [state]
@@ -304,6 +322,24 @@
        (cond
          (= key :ctrl-c) (quit state)
          (= key :wheel) (update state :scroll + (* 3 (k :dy)))
+         (= key :mouse)
+         # A left click on a button of the cloud takes it into the line,
+         # and one on a line of the scrolled block submits what the app's
+         # `:click` makes of it.
+         (when (and (k :press) (= 0 (k :button)))
+           (def [r c] [(dec (k :row)) (dec (k :col))])
+           (def [top height] (get state :flex [0 0]))
+           (if-let [span (find |(and (= r ($ :row)) (<= ($ :from) c) (< c ($ :to)))
+                               (get state :spans []))]
+             (do
+               (tui/editor/set ed (get-in state [:explanation :choices (span :choice) :text]))
+               (put state :choice nil)
+               (put state :input? true)
+               (set changed true))
+             (when-let [click (get-in state [:app :click])
+                        _ (and (<= top r) (< r (+ top height)))
+                        line (click (state :view) (+ (- r top) (get state :scroll 0)))]
+               (set submitted [line false]))))
          (and (state :input?) (= key :tab))
          # Tab picks a button of the cloud, Tab again the next one and
          # Shift+Tab the one before; the line is left as it is.
@@ -379,7 +415,9 @@
     another, a second each,
   * `:quick` -- a table from a key's text to the line it begins outside
     the line, ahead of the handle's own keys: with `{"b" "/b"}`, `b3`
-    and Enter submit `/b3`.
+    and Enter submit `/b3`,
+  * `:click` -- `(fn [view i])` returning the line a left click on the
+    line `i` of the scrolled block submits, or nil when it does nothing.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
   gp/tui draws them. `:explain` can give more lines as `{:lines lines}`,
@@ -393,7 +431,9 @@
   back. Outside it j/k, arrows, PgUp/PgDn and the wheel
   scroll, q quits; Ctrl+C quits anywhere. A key of `:quick` begins its
   line there: Enter alone submits it, and the line is left again then,
-  or with Esc, which takes it away.
+  or with Esc, which takes it away. A left click on a button of the
+  cloud takes it into the line, as Tab and Enter do, and one on a line
+  of the scrolled block submits what `:click` makes of it.
   ```
   [config app]
   # What is said on stderr while the alternate screen is up would leave

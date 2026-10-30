@@ -82,4 +82,27 @@
         "a line not begun by a quick key breaks on Enter")
 (end-suite)
 
+(start-suite :handle-mouse)
+(def- spans (get-in (require "../twm/handle") ['spans :value]))
+(defn- left [row col] {:key :mouse :button 0 :press true :row row :col col})
+(def state @{:app {:click (fn [_ i] (if (= i 3) "/f3"))}
+             :view @{} :input? false :scroll 1 :flex [4 10]
+             :editor (tui/make-editor {:prompt "> "})
+             :explained ""
+             :explanation {:lines [["Use " {:text " $mtb " :style :cyan}]]
+                           :choices [{:text "$mtb " :at [0 1]}]}})
+(put state :spans (spans state 1))
+(assert (deep= @[{:row 1 :from 6 :to 12 :choice 0}] (state :spans))
+        "a button of the cloud is found where it is drawn")
+(press state (left 2 8))
+(assert (and (state :input?) (= "$mtb " (line state)))
+        "a click on it takes it into the line")
+(tui/editor/set (state :editor) "")
+(assert (indexed? (press state (left 7 1)))
+        "a click on a line of the block submits what the app makes of it")
+(assert (nil? (press state (left 8 1))) "and one on a line it makes nothing of does not")
+(assert (nil? (press state (merge (left 7 1) {:press false})))
+        "nor does letting go")
+(end-suite)
+
 (os/exit 0)
