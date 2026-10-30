@@ -80,6 +80,14 @@
 (press state {:key :char :text "i"} {:key :char :text "x"} {:key :enter})
 (assert (and (state :input?) (= "x\n" (line state)))
         "a line not begun by a quick key breaks on Enter")
+(var planning false)
+(def state @{:app {:quick (fn [] (if planning {"3" "3"} {"b" "/b"}))}
+             :input? false :editor (tui/make-editor {:prompt "> "})})
+(press state {:key :char :text "3"})
+(assert (not (state :input?)) "a quick key given by a function, when it gives it")
+(set planning true)
+(press state {:key :char :text "3"})
+(assert (and (state :quick) (= "3" (line state))) "asked again at every key")
 (end-suite)
 
 (start-suite :handle-mouse)

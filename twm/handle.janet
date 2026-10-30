@@ -308,6 +308,12 @@
   (put state :input? false)
   (put state :quick nil))
 
+(defn- quick-line
+  "The line the quick key `text` begins, by the app's `:quick` as it stands."
+  [state text]
+  (def quick (get-in state [:app :quick]))
+  (get (if (function? quick) (quick) quick) text))
+
 (defn- ^key [k]
   (def key (k :key))
   (var submitted nil)
@@ -373,10 +379,10 @@
                          (tui/editor/submit ed)
                          (if (state :quick) (leave-quick state)))
                :changed (set changed true))))
-         (and (= key :char) (get-in state [:app :quick (k :text)]))
+         (and (= key :char) (quick-line state (k :text)))
          # A quick key begins its line, and Enter alone submits it.
          (do
-           (tui/editor/set ed (get-in state [:app :quick (k :text)]))
+           (tui/editor/set ed (quick-line state (k :text)))
            (merge-into state {:input? true :quick true})
            (set changed true))
          (case [key (k :text)]
@@ -415,7 +421,9 @@
     another, a second each,
   * `:quick` -- a table from a key's text to the line it begins outside
     the line, ahead of the handle's own keys: with `{"b" "/b"}`, `b3`
-    and Enter submit `/b3`,
+    and Enter submit `/b3`. A function `(fn [])` returning the table is
+    asked at every key, for quick keys that change with what the app is
+    doing,
   * `:click` -- `(fn [view i])` returning the line a left click on the
     line `i` of the scrolled block submits, or nil when it does nothing.
 
