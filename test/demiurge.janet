@@ -36,6 +36,20 @@
   (assert (not (peer/buildable? state :cmc))))
 (end-suite)
 
+(start-suite :fleet-excludes-subthickets)
+# A Thicket of Thickets lists its tenants in :builds to report on them,
+# but a tenant is another thicket's Demiurge, run from its own checkout.
+# A release that compiled one would build another thicket as its own.
+(let [state @{:builds [:tree :metabolon]
+              :entries {:tree "tree.janet" :metabolon "demiurge.janet"}
+              :config {:symbionts {:metabolon {:entry "demiurge.janet"
+                                               :subthicket {:build-path "/srv/src/metabolon"}}}}}]
+  (assert (deep= @["build peer tree"] (decisions Build state)) "a release builds no subthicket")
+  (assert (deep= @["deploy peer tree"] (decisions Deploy state)) "and deploys none")
+  (assert (peer/buildable? state :tree))
+  (assert (not (peer/buildable? state :metabolon)) "nor may one be built or deployed by name"))
+(end-suite)
+
 (start-suite :test-subprocess-results)
 (let [file (path/join (or (os/getenv "TEMP") "/tmp")
                       (string "twm-test-child-" (os/getpid) ".janet"))

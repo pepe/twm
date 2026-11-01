@@ -158,10 +158,23 @@
   [release-path peer]
   (path/join release-path (. (peer/file-name peer) ".sha")))
 
+(defn peers/built
+  ```
+  The peers in `:builds` that this Demiurge compiles and installs: every
+  one but a subthicket.
+
+  A subthicket is another thicket's Demiurge, run from its own checkout;
+  its parent never compiles it. Listed in `:builds` it is still reported
+  on, but a parent's release that tried to build it would compile another
+  thicket's `demiurge.janet` as one of its own executables.
+  ```
+  [state]
+  (filter |(not (peer/subthicket state $)) (or (state :builds) @[])))
+
 (defn peer/buildable?
   "Whether `peer` is explicitly configured as a Demiurge build target."
   [state peer]
-  (some |(= peer $) (or (state :builds) @[])))
+  (truthy? (some |(= peer $) (peers/built state))))
 
 (def subthicket/variable
   ```
@@ -692,9 +705,9 @@
     (. "deploy peer " peer)))
 
 (define-watch Deploy
-  "Deploys the declared peer fleet; CLI handles have a separate build path."
-  [_ {:builds builds} _]
-  (seq [peer :in builds] (^peer/deploy-one peer)))
+  "Deploys the declared peer fleet but its subthickets; CLI handles have a separate build path."
+  [_ state _]
+  (seq [peer :in (peers/built state)] (^peer/deploy-one peer)))
 
 (defn ^peer/build
   "Builds one `peer`"
@@ -739,9 +752,9 @@
     (. "build peer " peer)))
 
 (define-watch Build
-  "Builds the declared peer fleet, excluding CLI handles in :entries."
-  [_ {:builds builds} _]
-  (seq [p :in builds] (^peer/build p)))
+  "Builds the declared peer fleet but its subthickets, excluding CLI handles in :entries."
+  [_ state _]
+  (seq [p :in (peers/built state)] (^peer/build p)))
 
 (defn ^mark-release
   "Marks that release has started"
@@ -925,8 +938,10 @@
   (produce/applied [(make-effect (fn [_ s _] (set state s)))])
   {:source (artifact/source (state :build-path))
    :peers (tabseq [peer :in (state :builds)]
-            peer {:installed (artifact/read-installed
-                               (executable (path/join (state :release-path) (peer/file-name peer))))
+            # A subthicket has no executable here; its own reports its own.
+            peer {:installed (unless (peer/subthicket state peer)
+                               (artifact/read-installed
+                                 (executable (path/join (state :release-path) (peer/file-name peer)))))
                   :active (when (get-in state [:view :spawned peer])
                             (get-in state [:view :lifetimes peer :active]))
                   :lifecycle (freeze (select-keys (get-in state [:view :lifetimes peer] {})
