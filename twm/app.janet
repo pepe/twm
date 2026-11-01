@@ -462,19 +462,21 @@ dynamics as set by *rpc-defines*.```
     # Said on every request, either way: one connection carries many, and
     # a mark left from the last must not render the next.
     (setdyn :door/address (if (get allowed origin) address))
+    (def headers (cors/headers origin))
+    (def lines (string/join (seq [[k v] :pairs headers] (string k ": " v "\r\n"))))
     (cond
       (not (get allowed origin)) (handler req)
-      (= "OPTIONS" (req :method))
-      {:status 204 :body "" :headers (cors/headers origin)}
-      (let [res (handler req)
-            headers (cors/headers origin)]
+      (= "OPTIONS" (req :method)) (http/response 204 "" headers)
+      (let [res (handler req)]
+        # A handler answers with rendered bytes, or with a function that
+        # writes its own head to the connection -- a stream.
         (cond
           (function? res)
-          (let [lines (string/join (seq [[k v] :pairs headers]
-                                     (string k ": " v "\r\n")))]
-            (fn cors-response [conn] (res (cors/conn conn lines))))
-          (dictionary? res)
-          (merge res {:headers (merge (get res :headers {}) headers)})
+          (fn cors-response [conn] (res (cors/conn conn lines)))
+          (bytes? res)
+          (if-let [at (string/find "\r\n\r\n" res)]
+            (string (string/slice res 0 (+ at 2)) lines (string/slice res (+ at 2)))
+            res)
           res)))))
 
 (defn ^space/http
@@ -1232,6 +1234,27 @@ dynamics as set by *rpc-defines*.```
     (if saying (ds/msg/patch-elements (hg/html saying) into "inner") "")
     (ds/msg/beat into path beat)))
 
+(defn ds/action-with
+  ```
+  Constructs a Datastar action of `method` on the URL made of `parts`,
+  with `options` -- the inside of the options object, as Datastar reads it,
+  `requestCancellation: el.stream` say -- or none. Rendered for an Avatar's
+  request, the bearer header joins them; see `ds/action`.
+  ```
+  [method options & parts]
+  (def address (dyn :door/address))
+  (def all
+    (filter present?
+            [options
+             (if address "headers: {Authorization: 'Bearer ' + $_bearer}")]))
+  (string "@" method "('"
+          ;(if address
+             [(if (string/has-suffix? "/" address) (slice address 0 -2) address)]
+             [])
+          ;parts "'"
+          ;(if (empty? all) [] [", {" (string/join all ", ") "}"])
+          ")"))
+
 (defn ds/action
   ```
   Constructs a Datastar action of `method` on the URL made of `parts`.
@@ -1243,12 +1266,7 @@ dynamics as set by *rpc-defines*.```
   for the place's own page, it is the root-relative action it always was.
   ```
   [method & parts]
-  (def address (dyn :door/address))
-  (if address
-    (string "@" method "('"
-            (if (string/has-suffix? "/" address) (slice address 0 -2) address)
-            ;parts "', {headers: {Authorization: 'Bearer ' + $_bearer}})")
-    (string "@" method "('" ;parts "')")))
+  (ds/action-with method nil ;parts))
 
 (defn ds/get
   "Constructs ds get uri, see `ds/action`."
