@@ -142,3 +142,34 @@
                (sentry/session/presented {:headers {"Cookie" {"session" @["t" "u"]}}})))
 (assert (empty? (sentry/session/presented {:headers {"Authorization" "Basic x"}})))
 (end-suite)
+
+(start-suite :register-tokens)
+(def registered
+  (tree/register :peer @{"tok" "locker/dan"}))
+(assert (registered {:headers {"Authorization" "Bearer tok"}})
+        "registering under live tokens answers a capability admitting them")
+(assert ((tree/register :peer "single") {:headers {"Cookie" {"session" "single"}}})
+        "and under one session string as before")
+(end-suite)
+
+(start-suite :guarded-owner)
+(def avatar ((=>symbiont/initial-state :dan) (config)))
+(assert (= :dan (avatar :session/owner)) "an Avatar of one identity owns its sessions")
+(assert (= :dan (session/owner avatar)))
+(def plain (config))
+(put-in plain [:symbionts :sentry :identities] nil)
+(def guarded ((=>symbiont/initial-state :dan) plain))
+(assert (nil? (guarded :session/owner)))
+(assert (= :sentry (session/owner guarded)) "one guarded by a plain sentry still has its guardian's")
+(def crossing (config))
+(put-in crossing [:symbionts :dan :crosses] true)
+(put-in crossing [:membrane :nodes :interstudy/dan-sentry]
+        @{:rpc "localhost:9" :key "k" :door "interstudy/dan-sentry"
+          :address "https://dan.admin.example"})
+(def crosser ((=>symbiont/initial-state :dan) crossing))
+(assert (deep= {:rpc "localhost:9" :key "k" :address "https://dan.admin.example"}
+               (get-in crosser [:crossings "interstudy/dan-sentry"]))
+        "a symbiont that crosses gets the doors it may cross to")
+(assert (nil? (((=>symbiont/initial-state :matej) crossing) :crossings))
+        "one that does not, gets none")
+(end-suite)

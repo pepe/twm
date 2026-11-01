@@ -36,6 +36,16 @@
   (def {:public-key pk :secret-key sk} (jhydro/sign/keygen))
   {:public-key (string pk) :secret-key (string sk)})
 
+(defn yarlyk/public-key
+  ```
+  The public key of the Baskak signing with `secret-key`: what a door
+  lists in its `:door/issuers`. A hydro signing secret key carries it as
+  its second half, so whoever holds the secret key can always say it.
+  ```
+  [secret-key]
+  (assert (= 64 (length secret-key)) "A signing secret key is 64 bytes")
+  (string (string/slice secret-key 32)))
+
 (defn yarlyk/serial
   "A fresh serial: 16 random bytes in hex, the nonce a door remembers."
   []

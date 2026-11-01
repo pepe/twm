@@ -21,6 +21,11 @@
     [:refused reason] reason
     res res))
 
+(start-suite :yarlyk-public-key)
+(assert (= (baskak :public-key) (yarlyk/public-key (baskak :secret-key)))
+        "the public key is said from the secret key")
+(end-suite)
+
 (start-suite :yarlyk-round-trip)
 (def wire (yarlyk/issue claims (baskak :secret-key) 60 now))
 (def [status got] (yarlyk/verify wire (door) now))

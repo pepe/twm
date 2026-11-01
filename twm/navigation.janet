@@ -64,6 +64,19 @@
                        :address (node :address)})}
       {})))
 
+(defn =>guarded/owner
+  ```
+  Navigation to whose sessions open a guarded symbiont, when its guardian
+  holds several identities: its own, as the guardian's place for it is
+  owned by that person. Any other symbiont is left to `session/owner`.
+  ```
+  [symbiont]
+  (fn [config]
+    (def guardian (get-in config [:symbionts symbiont :guarded-by]))
+    (if (get-in config [:symbionts guardian :identities symbiont])
+      {:session/owner symbiont}
+      {})))
+
 (defn =>symbiont/image
   "Navigation to a symbiont's persisted image."
   [symbiont]
@@ -107,6 +120,7 @@
         (<:= t (=>symbiont/membrane symbiont))
         (<:= t (=>symbiont/image symbiont))
         (<:= t (=>symbiont/crossings symbiont))
+        (<:= t (=>guarded/owner symbiont))
         (<:= t (=>demiurge/initial-state symbiont))
         (<:= t (sentry/=>sentry/initial-state symbiont))
         (>base t))))

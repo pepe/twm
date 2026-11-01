@@ -29,7 +29,10 @@
   "Connects a registered peer and returns its current session capability."
   [peer session & successors]
   (produce (^peer/connect peer ;successors))
-  (sentry/=>session/?eq session))
+  # The stored session is one string, or the place's live tokens.
+  (if (dictionary? session)
+    (sentry/=>session/?live session)
+    (sentry/=>session/?eq session)))
 
 (defn deregister
   "Builds deregistration events, ending with safe peer disconnection."

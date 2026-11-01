@@ -1353,7 +1353,10 @@ dynamics as set by *rpc-defines*.```
   RPC call does not tell the callee who is calling.
   ```
   [state]
-  (get state :guarded-by (state :name)))
+  # A symbiont guarded by one identity among several owns its sessions
+  # itself, and its navigation says so.
+  (or (get state :session/owner)
+      (get state :guarded-by (state :name))))
 
 (defn place/owner
   ```
