@@ -1169,6 +1169,10 @@
   one relation, beside the Demiurge's own door. The thicket's mycelium
   and its operators' door stay exactly as they are without a parent.
   `:stop` there is `Leave`: the parent is asking a whole thicket to go.
+
+  A Demiurge whose own work is to stand between its parent and thickets
+  of its own -- a Thicket of Thickets under another -- names in its
+  state's `:door/operations` what of its own its parent may ask besides.
   ```
   [relation]
   (def {:rpc url :psk psk} relation)
@@ -1176,7 +1180,8 @@
     (fn [_ state _]
       (def own (get-in state [:rpc :functions] {}))
       (def functions
-        (merge (select-keys own subthicket/door-operations)
+        (merge (select-keys own [;subthicket/door-operations
+                                 ;(get state :door/operations [])])
                {:ping (fnr :ping [] :pong)
                 :stop (fnr :stop [produce-resp ok-resp]
                            [(log "The parent asks the thicket to go") Leave])}))

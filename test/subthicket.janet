@@ -15,8 +15,9 @@
 (def psk/parent "parent-psk-parent-psk-parent-psk")
 (def psk/child "child-psk-child-psk-child-psk-ch")
 (def base (+ 21000 (* 10 (math/floor (* 300 (math/random))))))
+(def psk/top "top-psk-top-psk-top-psk-top-psk-")
 (def ports {:parent (+ base 1) :child (+ base 2) :sleeper (+ base 3)
-            :door (+ base 4)})
+            :door (+ base 4) :top (+ base 5) :middle-door (+ base 6)})
 (defn at [k] (string "localhost:" (ports k)))
 
 (defn rm-tree
@@ -336,5 +337,83 @@
   (assert (= 0 (os/proc-wait parent)) "and the parent exits as asked, not killed")
   (assert (not (string/find "did not exit" (parent-log))) "with nobody killed on the way")
   (end-suite))
+
+# Three levels: a top Demiurge over the parent, over the child, over its
+# peer. The parent stands between, as a Thicket of Thickets under another
+# does, and lets the top ask one thing of its own through its door.
+(def top-dir (path/join root "top"))
+
+(def top-config
+  {:name "top"
+   :deploy {:host "localhost" :build-path top-dir
+            :release-path (path/join top-dir "_release")
+            :data-path (path/join top-dir "data")}
+   :runtime {:debug false :log true}
+   :mycelium {:psk psk/top
+              :nodes {:demiurge {:rpc (at :top) :peers [:parent]}
+                      :parent {:rpc (at :middle-door)}}}
+   :membrane {:nodes {:demiurge {:rpc (at :top)}}}
+   :symbionts {:demiurge {:entry "demiurge.janet" :builder false
+                          :autostart [:parent] :builds [:parent]}
+               :parent {:entry "demiurge.janet" :shutdown 45
+                        :subthicket {:build-path parent-dir :run-peers true
+                                     :log (path/join parent-dir "data" "demiurge.log")}}}})
+
+(defn middle-script
+  ```
+  The parent's Demiurge as a middle one: one operation of its own for its
+  parent's door, and one it keeps to itself.
+  ```
+  [dir]
+  (string/replace "(>update :rpc (update-rpc rpc-funcs))"
+                  (string "(>update :rpc (update-rpc (merge rpc-funcs @{:hello (fn [&] :hi) :secret (fn [&] :kept)})))\n"
+                          "        (>put :door/operations [:hello])")
+                  (demiurge-script dir)))
+
+(defn lay-out-three []
+  (lay-out)
+  (each d [top-dir (path/join top-dir "data")] (os/mkdir d))
+  (spit (path/join parent-dir "demiurge.janet") (middle-script parent-dir))
+  (spit (path/join top-dir "demiurge.janet") (demiurge-script top-dir))
+  (spit (path/join top-dir "conf.jdn") (string/format "%j" top-config)))
+
+(defn raise-three
+  "Raises the top, which raises the parent, which raises the child and its peer."
+  []
+  (def top (spawn-demiurge top-dir))
+  (assert (eventually |(up? (ports :top))) "the top rises")
+  (call (ports :top) psk/top :run-peers)
+  (assert (eventually |(up? (ports :middle-door)) 30) "and raises the parent, which opens the top's door")
+  (assert (eventually |(up? (ports :sleeper)) 30)
+          "which raises the child when asked, and the child its own peer")
+  top)
+
+(defn top-log [] (string (get logs top-dir "")))
+
+(start-suite :three-levels)
+(lay-out-three)
+(def top (raise-three))
+(def middle-psk (subthicket/psk psk/top :parent))
+(assert (= :hi (call (ports :middle-door) middle-psk :hello))
+        "the parent's door carries what it names for the top in :door/operations")
+(assert (match (call (ports :middle-door) middle-psk :secret) [:failed _] true)
+        "and nothing else of its own")
+(assert (match (call (ports :middle-door) middle-psk :state) [:running _ peers] (index-of :child peers))
+        "the top sees the parent holding the child")
+(def pids [(pid-of (path/join parent-dir "pid")) ;(herd)])
+(kill (pid-of (path/join top-dir "pid")))
+(os/proc-wait top)
+(assert (eventually |(gone? pids) quick)
+        "a killed top takes the whole tree with it: parent, child and peer")
+(assert (all-down?))
+(lay-out-three)
+(def top (raise-three))
+(def pids [(pid-of (path/join parent-dir "pid")) ;(herd)])
+(call (ports :top) psk/top :stop)
+(assert (eventually |(gone? pids) quick) "stopping the top stops every level beneath it")
+(assert (= 0 (os/proc-wait top)) "and the top exits cleanly")
+(assert (not (string/find "did not exit" (top-log))) "with nobody killed on the way")
+(assert (string/find "parent generation 1 exited: 0" (top-log)) "the parent left by itself")
+(end-suite)
 
 (rm-tree root)
