@@ -177,17 +177,51 @@
      :watch (if announce [(projection/^ready) AetherReady])}
     "save session"))
 
+(defn ^session/caps
+  ```
+  Saves each owner's session capability in the views of the places that
+  owner's sessions open, `caps` being keyed by owner.
+
+  A guardian of several identities holds a place per person, and one
+  person's capability must never reach another's place. An owner `caps`
+  does not mention leaves its places as they were.
+  ```
+  [caps &opt announce]
+  (make-event
+    {:update
+     (fn [_ state]
+       (each place (spaces state)
+         (def owner (place/owner state place))
+         (when-let [view (place :view)
+                    _ (has-key? caps owner)]
+           (put view :cap/session (caps owner)))))
+     :watch (if announce [(projection/^ready) AetherReady])}
+    "save sessions"))
+
 (defn ^tree/register
-  "Registers outside the manager, then installs the capability before successors."
+  ```
+  Registers outside the manager, then installs the capability before successors.
+
+  A symbiont whose places all open with one owner's sessions registers
+  under that owner, as always. One holding places of several owners
+  registers under the first and asks the tree for every other owner's
+  capability, so each place gets its own.
+  ```
   [peer &opt announce & after]
   (make-watch
     (fn [_ state _]
       (def name (state :name))
+      (def [first-owner & others] (session/owners state))
       (producer
         # The owner says whose session the returned capability should
         # open. A tree keeping one for the whole Thicket ignores it.
-        (def cap (:register (state peer) name (session/owner state)))
-        (produce (^session/cap cap announce) ;(or after []))))
+        (def cap (:register (state peer) name first-owner))
+        (if (empty? others)
+          (produce (^session/cap cap announce) ;(or after []))
+          (let [caps @{first-owner cap}]
+            (each owner others
+              (put caps owner (:cap/session (state peer) owner)))
+            (produce (^session/caps caps announce) ;(or after []))))))
     (. "register " peer)))
 
 (defn ^register

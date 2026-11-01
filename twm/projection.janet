@@ -73,10 +73,19 @@
             :watch [(^unready/failed "RPC connection closed")]}
            "let Tree projection go")
        (producer
-         (def [ok answer]
-           # The owner says whose session `:cap/session` should be. A tree
-           # keeping one for the whole Thicket ignores it.
-           (protect (:snapshot tree colls (session/owner state))))
+         # The owner says whose session `:cap/session` should be. A tree
+         # keeping one for the whole Thicket ignores it. A guardian of
+         # several identities holds places of several owners, and each
+         # place is shown its own owner's answer; every other symbiont has
+         # one owner, and asks once, as it always did.
+         (def answers @{})
+         (var ok true)
+         (var answer nil)
+         (each owner (session/owners state)
+           (when ok
+             (def [fetched got] (protect (:snapshot tree colls owner)))
+             (if fetched (put answers owner got) (set ok false))
+             (set answer got)))
          (var applied false)
          (var failure answer)
          (produce
@@ -86,9 +95,12 @@
                 (when ok
                   (def [accepted drafts]
                     (protect
-                      (seq [space :in (spaces state) :when (space :view)]
+                      (seq [space :in (spaces state)
+                            :when (space :view)
+                            :let [owned (get answers (place/owner state space))]
+                            :when owned]
                         [(space :view)
-                         (install (merge @{} (space :view)) answer
+                         (install (merge @{} (space :view)) owned
                                   (space :projection/prepare))])))
                   (if accepted
                     (do (each [view draft] drafts

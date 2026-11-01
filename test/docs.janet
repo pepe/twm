@@ -13,4 +13,7 @@
 (assert-docs "../twm/guarded")
 (assert-docs "../twm/demiurge")
 (assert-docs "../twm/handle")
+(assert-docs "../twm/yarlyk")
+(assert-docs "../twm/baskak")
+(assert-docs "../twm/door")
 (end-suite)

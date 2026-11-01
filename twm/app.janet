@@ -396,6 +396,87 @@ dynamics as set by *rpc-defines*.```
       (when-let [view (space :view)] (readiness/settle view :ready)))
     (. "resume " (space :name))))
 
+(defn cors/headers
+  ```
+  What a place answers a request from `origin`, one of the origins it
+  lets in: that origin and no other, the headers an Avatar entering
+  through a door sends, and nothing about credentials, because no cookie
+  ever crosses -- the session travels as a bearer.
+  ```
+  [origin]
+  {"Access-Control-Allow-Origin" origin
+   "Access-Control-Allow-Headers" "Authorization, Content-Type, Datastar-Request"
+   "Access-Control-Allow-Methods" "GET, POST, OPTIONS"
+   "Access-Control-Max-Age" "600"
+   "Vary" "Origin"})
+
+(defn- cors/conn
+  ```
+  Stands in for `conn` so the CORS `lines` reach the head of a response
+  that writes its own.
+
+  A stream writes its head straight to its connection, so the only way to
+  add to it is to be the connection: the head ends with the first empty
+  line, and the lines go in just before it. Everything after passes
+  through untouched. Only `:write`, `:flush` and `:close` are asked of a
+  connection by the responses gp writes, as gp's own `sse-writer` relies
+  on.
+  ```
+  [conn lines]
+  (var pending true)
+  @{:write (fn cors-write [self s]
+             (if pending
+               (if-let [at (string/find "\r\n\r\n" s)]
+                 (do (set pending false)
+                     (:write conn (string (string/slice s 0 (+ at 2)) lines
+                                          (string/slice s (+ at 2)))))
+                 (if (= "\r\n" (string s))
+                   (do (set pending false)
+                       (:write conn (string lines s)))
+                   (:write conn s)))
+               (:write conn s))
+             self)
+    :flush (fn cors-flush [self] (:flush conn) self)
+    :close (fn cors-close [self] (:close conn) self)})
+
+(defn cors/wrap
+  ```
+  Lets the `origins` a place names fetch from it across origins.
+
+  An Avatar serves its Membrane from a host of its own and asks the place
+  it entered for `/content` and the actions inside it, with its session as
+  a bearer. The browser allows that only when the place says so: it asks
+  first with `OPTIONS`, and then reads the answer only if the place names
+  the Avatar's origin. A request from any other origin, or from none --
+  the place's own pages -- is answered exactly as before.
+
+  A request let in across origins is answered in a page that is not the
+  place's own, so every action it renders must name the place in full and
+  carry the bearer. It says so to whatever renders it by `:door/address`,
+  the place's `address`, which `ds/get` and `ds/post` read.
+  ```
+  [handler origins &opt address]
+  (def allowed (tabseq [o :in origins] o true))
+  (fn cors [req]
+    (def origin (get-in req [:headers "Origin"]))
+    # Said on every request, either way: one connection carries many, and
+    # a mark left from the last must not render the next.
+    (setdyn :door/address (if (get allowed origin) address))
+    (cond
+      (not (get allowed origin)) (handler req)
+      (= "OPTIONS" (req :method))
+      {:status 204 :body "" :headers (cors/headers origin)}
+      (let [res (handler req)
+            headers (cors/headers origin)]
+        (cond
+          (function? res)
+          (let [lines (string/join (seq [[k v] :pairs headers]
+                                     (string k ": " v "\r\n")))]
+            (fn cors-response [conn] (res (cors/conn conn lines))))
+          (dictionary? res)
+          (merge res {:headers (merge (get res :headers {}) headers)})
+          res)))))
+
 (defn ^space/http
   ```
   Producer running the HTTP server of one living `space`.
@@ -429,7 +510,11 @@ dynamics as set by *rpc-defines*.```
               # being put there. A space without one gets gp's plain 404.
               static (put :not-found
                           (http/static public nil (routes :not-found)))
-              true http/drive log? (event-journal name))))
+              true http/drive
+              # Its membrane names who may fetch from it across origins,
+              # and whoever holds the place answers them alike.
+              (present? (space :origins)) (cors/wrap (space :origins) (space :address))
+              log? (event-journal name))))
   (make-watch
     (producer
       (space/dwell view)
@@ -1147,15 +1232,33 @@ dynamics as set by *rpc-defines*.```
     (if saying (ds/msg/patch-elements (hg/html saying) into "inner") "")
     (ds/msg/beat into path beat)))
 
+(defn ds/action
+  ```
+  Constructs a Datastar action of `method` on the URL made of `parts`.
+
+  Rendered for a request an Avatar made across origins (`cors/wrap` says
+  so by `:door/address`), the action names the place in full and carries
+  the session as a bearer, read from the Avatar's local `$_bearer` signal
+  -- a signal whose name begins with an underscore is never sent. Rendered
+  for the place's own page, it is the root-relative action it always was.
+  ```
+  [method & parts]
+  (def address (dyn :door/address))
+  (if address
+    (string "@" method "('"
+            (if (string/has-suffix? "/" address) (slice address 0 -2) address)
+            ;parts "', {headers: {Authorization: 'Bearer ' + $_bearer}})")
+    (string "@" method "('" ;parts "')")))
+
 (defn ds/get
-  "Constructs ds get uri"
+  "Constructs ds get uri, see `ds/action`."
   [& parts]
-  (string "@get('" ;parts "')"))
+  (ds/action "get" ;parts))
 
 (defn ds/post
-  "Constructs ds post uri"
+  "Constructs ds post uri, see `ds/action`."
   [& parts]
-  (string "@post('" ;parts "')"))
+  (ds/action "post" ;parts))
 
 (defn ds/hg-stream #TODO rename
   "Convenience for defining SSE stream handler"
@@ -1251,6 +1354,22 @@ dynamics as set by *rpc-defines*.```
   ```
   [state]
   (get state :guarded-by (state :name)))
+
+(defn place/owner
+  ```
+  The owner of the sessions that open `place`, one of the spaces `state`
+  raises.
+
+  A place of one identity among several says its own; every other place
+  opens with the sessions of the symbiont's owner, `session/owner`.
+  ```
+  [state place]
+  (or (get place :owner) (session/owner state)))
+
+(defn session/owners
+  "The distinct owners of the sessions that open the places `state` raises, sorted."
+  [state]
+  (sorted (distinct (map |(place/owner state $) (spaces state)))))
 
 (defn <script/redirect/>
   "Navigates only after the target reports readiness; optionally require its role."

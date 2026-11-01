@@ -71,14 +71,33 @@
   config/persisted?
   config/caps?
   {:guarded-by (?optional peer?)
-   :timeout (?optional number?)})
+   :timeout (?optional number?)
+   :crosses (?optional boolean?)})
+
+(def?! config/identity
+  dictionary?
+  {:secret present-string?
+   :key present-string?})
+
+(def?! config/identities
+  dictionary?
+  {keys (>?? all peer?)
+   values (>?? all config/identity?)})
+
+(def?! config/admit
+  dictionary?
+  {:avatar present-string?})
 
 (def?! config/sentry
   dictionary?
   config/entry?
   config/caps?
   {:secret (?optional present-string?)
-   :key (?optional present-string?)})
+   :key (?optional present-string?)
+   :identities (?optional config/identities?)
+   :door/issuers (?optional (>?? all present-string?))
+   :door/admits (?optional (>?? all config/admit?))
+   :door/yarlyk-max (?optional number?)})
 
 (def?! config/command
   config/avatar?)
@@ -120,7 +139,9 @@
 (def?! config/membrane/rpc-node
   dictionary?
   {:rpc url?
-   :key (?optional present-string?)})
+   :key (?optional present-string?)
+   :door (?optional present-string?)
+   :address (?optional present-string?)})
 
 (def?! config/membrane/http-node
   dictionary?
@@ -130,9 +151,13 @@
    :entrance (?optional boolean?)
    :neighbors (?optional (>?? all peer?))
    :static (?optional boolean?)
-   :public (?optional present-string?)}
+   :public (?optional present-string?)
+   :origins (?optional (>?? all present-string?))}
   (>if (=> :static true?)
-       (=> :public (>assert present-string?))))
+       (=> :public (>assert present-string?)))
+  # What a place renders for another origin names the place in full.
+  (>if (=> :origins present?)
+       (=> :address (>assert present-string?))))
 
 (def?! config/membrane/nodes
   dictionary?

@@ -1,0 +1,130 @@
+(use spork/test)
+(import jhydro)
+(import ../twm/yarlyk :prefix "")
+
+(def baskak (yarlyk/keygen))
+(def other (yarlyk/keygen))
+(def now 1761990000)
+
+(def claims
+  {:issuer "locker/baskak" :avatar "locker/dan" :capability :admin
+   :consequence :session/open :door "interstudy/dan-sentry"})
+
+(defn door [&opt over]
+  (merge @{:issuers [(baskak :public-key)] :door "interstudy/dan-sentry"
+           :consequence :session/open :max-ttl 120 :started (- now 100)
+           :seen @{}}
+         (or over {})))
+
+(defn refused [wire &opt over at]
+  (match (yarlyk/verify wire (door over) (or at now))
+    [:refused reason] reason
+    res res))
+
+(start-suite :yarlyk-round-trip)
+(def wire (yarlyk/issue claims (baskak :secret-key) 60 now))
+(def [status got] (yarlyk/verify wire (door) now))
+(assert (= :ok status) "a fresh warrant verifies")
+(assert (= "locker/dan" (got :avatar)))
+(assert (= :admin (got :capability)))
+(assert (= (+ now 60) (got :expires)) "validity is the issuer's ttl")
+(assert (= 32 (length (got :serial))))
+(assert (= 64 (length (wire :signature))))
+(assert (not= ((yarlyk/issue claims (baskak :secret-key) 60 now) :yarlyk)
+              (wire :yarlyk))
+        "every warrant gets a serial of its own")
+(end-suite)
+
+(start-suite :yarlyk-forgery)
+(def wire (yarlyk/issue claims (baskak :secret-key) 60 now))
+(def tampered (string/replace "locker/dan" "locker/eve" (wire :yarlyk)))
+(assert (= :signature (refused {:yarlyk tampered :signature (wire :signature)}))
+        "a changed payload does not verify")
+(def sig (buffer (wire :signature)))
+(put sig 0 (bxor (sig 0) 1))
+(assert (= :signature (refused {:yarlyk (wire :yarlyk) :signature (string sig)}))
+        "a changed signature does not verify")
+(assert (= :signature
+           (refused (yarlyk/issue claims (other :secret-key) 60 now)))
+        "an untrusted issuer is refused")
+(def foreign-ctx
+  {:yarlyk (wire :yarlyk)
+   :signature (string (jhydro/sign/create (wire :yarlyk) "othrctx1"
+                                          (baskak :secret-key)))})
+(assert (= :signature (refused foreign-ctx))
+        "a signature under another context is no warrant")
+(assert (= :signature (refused {:yarlyk (wire :yarlyk) :signature "short"})))
+(assert (= :malformed (refused "not a warrant")))
+(assert (= :malformed (refused {})))
+(defn signed [payload]
+  {:yarlyk payload
+   :signature (string (jhydro/sign/create payload yarlyk/ctx (baskak :secret-key)))})
+(assert (= :malformed (refused (signed "{:v 1 :kind"))) "unreadable JDN")
+(assert (= :malformed (refused (signed "{:v 1} {:v 1}"))) "exactly one form")
+(assert (= :malformed (refused (signed "[1 2]"))) "the form is a struct")
+(defn altered [over]
+  (string/format "%j" (struct ;(kvs (parse (wire :yarlyk))) ;(kvs over))))
+(assert (= :version (refused (signed (altered {:v 2})))))
+(assert (= :kind (refused (signed (altered {:kind :yarlyk/other})))))
+(assert (= :malformed (refused (signed (altered {:expires "never"})))))
+(end-suite)
+
+(start-suite :yarlyk-rotation)
+(def rotating {:issuers [(other :public-key) (baskak :public-key)]})
+(assert (= :ok (first (yarlyk/verify (yarlyk/issue claims (baskak :secret-key) 60 now)
+                                     (door rotating) now))))
+(assert (= :ok (first (yarlyk/verify (yarlyk/issue claims (other :secret-key) 60 now)
+                                     (door rotating) now)))
+        "either trusted issuer verifies while keys rotate")
+(end-suite)
+
+(start-suite :yarlyk-scope)
+(def matej (merge claims {:door "interstudy/matej-sentry"}))
+(assert (= :door (refused (yarlyk/issue matej (baskak :secret-key) 60 now)))
+        "a warrant for Matej's door does not open Dan's")
+(assert (= :consequence
+           (refused (yarlyk/issue (merge claims {:consequence :tree/write})
+                                  (baskak :secret-key) 60 now))))
+(end-suite)
+
+(start-suite :yarlyk-time)
+(def wire (yarlyk/issue claims (baskak :secret-key) 60 now))
+(assert (= :expired (refused wire nil (+ now 61))))
+(assert (= :ok (first (yarlyk/verify wire (door) (+ now 60)))) "valid to its last second")
+(assert (= :not-yet (refused (yarlyk/issue claims (baskak :secret-key) 60 (+ now 6)))))
+(assert (= :ok (first (yarlyk/verify (yarlyk/issue claims (baskak :secret-key) 60 (+ now 5))
+                                     (door) now)))
+        "a little skew is tolerated")
+(assert (= :ttl (refused (yarlyk/issue claims (baskak :secret-key) 600 now)))
+        "the door's longest validity wins over the issuer's")
+(assert (= :before-start (refused wire {:started (+ now 1)}))
+        "a warrant older than the door is refused")
+(end-suite)
+
+(start-suite :yarlyk-replay)
+(def seen @{})
+(def wire (yarlyk/issue claims (baskak :secret-key) 60 now))
+(assert (= :ok (first (yarlyk/verify wire (door {:seen seen}) now))))
+(assert (= [:refused :replayed] (yarlyk/verify wire (door {:seen seen}) (+ now 1))))
+(def forged {:yarlyk (wire :yarlyk) :signature (string/repeat "\0" 64)})
+(def fresh @{})
+(assert (= :signature (refused forged {:seen fresh})))
+(assert (empty? fresh) "a refused warrant leaves no serial behind")
+(yarlyk/forget seen (+ now 61))
+(assert (empty? seen) "an expired serial is forgotten")
+(end-suite)
+
+(start-suite :door-psk)
+(def psk (string/repeat "k" 32))
+(assert (= 32 (length (door/psk psk "locker" "interstudy" "dan-sentry"))))
+(assert (= (door/psk psk "locker" "interstudy" "dan-sentry")
+           (door/psk psk "locker" "interstudy" "dan-sentry"))
+        "derivation is deterministic")
+(assert (not= (door/psk psk "locker" "interstudy" "dan-sentry")
+              (door/psk psk "locker" "interstudy" "matej-sentry"))
+        "each door has its own key")
+(assert (not= (door/psk psk "locker" "interstudy" "dan-sentry")
+              (door/psk (string/repeat "j" 32) "locker" "interstudy" "dan-sentry")))
+(assert (not= (door/psk psk "a" "bc" "d") (door/psk psk "ab" "c" "d"))
+        "names cannot slide into one another")
+(end-suite)

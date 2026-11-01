@@ -88,6 +88,42 @@ And the ones they stand on:
   records, and verified installs.
 - `twm/dev` — watchers that restart or re-test a project's Demiurge when
   its sources change.
+- `twm/yarlyk` — the portable warrant: signing a Yarlyk (`yarlyk/issue`)
+  and checking one at a door (`yarlyk/verify`) for issuer, door,
+  consequence, validity and replay; and the key of one crossing between
+  Thickets (`door/psk`).
+- `twm/baskak` — the role that warrants: given an avatar, a door and a
+  capability, it checks an explicit grant and the grounds its Thicket
+  supplies, and issues a Yarlyk or says why not. It authorizes nothing.
+- `twm/door` — a guardian's second way in, its own RPC listener with the
+  key of one relation. It verifies a Yarlyk, applies its own `:door/admits`,
+  publishes one more session of its place and returns it as a bearer.
+
+## Entering from another Thicket
+
+A Thicket speaks to another only through its Membrane. An Avatar in one
+Thicket (an identity Thicket, say) enters a place guarded in another so:
+
+1. Its Baskak warrants the crossing: the avatar's live session is the
+   ground, and a grant in the Baskak's own configuration names the door and
+   the capability as a flag (`{:avatar :dan :door "interstudy/dan-sentry"
+   :admin true}`).
+2. The Avatar presents the Yarlyk at the destination guardian's door
+   (`:entry/admit`), a membrane rpc node of the guardian's own name with the
+   relation's `:key`. The guardian checks it against `:door/issuers`, its
+   own id and `:door/admits`, and answers `{:token :address}`.
+3. The token is one more live session of that place; nobody else's ends.
+   The Avatar serves its own Membrane on its own host and has the browser
+   fetch `/content` and the actions inside it from the place directly, with
+   `Authorization: Bearer <token>`. The place's membrane node lists the
+   Avatar's origin under `:origins`; `cors/wrap` answers those requests,
+   and `ds/get` and `ds/post` then render actions that name the place in
+   full and carry the bearer.
+
+The Yarlyk's validity is the Baskak's (`:yarlyk/ttl`, bounded by the door's
+`:door/yarlyk-max`), the session's lifetime the destination's, and the
+scope is the grant and the admit together. A guardian may also hold several
+identities (`:identities`), each its own entrance whose sessions it owns.
 
 ## Conventions
 
@@ -99,7 +135,9 @@ at registration) and borne as `:cap/session` — a symbiont verifies its
 cap; it never reads the registry. A session belongs to the guardian whose
 entrance granted it, and every call that publishes or reads one names
 that guardian (`session/owner`), so a Tree may keep one per door; a Tree
-keeping one for the whole Thicket ignores the name.
+keeping one for the whole Thicket ignores the name. A door may hold
+several live sessions at once (`sessions/record`): a sign-in adds one,
+and a logout ends only the one it presents.
 
 ## The Shadow is not the Tree
 

@@ -56,9 +56,45 @@
    save-event])
 
 (defn session/cap
-  "Returns an HTTP cookie capability for the stored session."
+  ```
+  Returns an HTTP capability for the stored session.
+
+  What is stored is either one session string, as a tree kept before a
+  door could hold several, or the door's live tokens as kept by
+  `sessions/record`. Either way the capability admits the cookie, and the
+  tokens also as a bearer.
+  ```
   [session]
-  (sentry/=>session/?eq session))
+  (if (dictionary? session)
+    (sentry/=>session/?live session)
+    (sentry/=>session/?eq session)))
+
+(defn sessions/record
+  ```
+  Records what `:session/new` was told in `sessions`, the tree's table of
+  live tokens by owner, and returns it.
+
+  The call keeps its old shape -- a session and its owner -- so a sentry
+  and a tree of different ages still understand each other, and says more
+  in an optional last argument:
+
+  - a token, with `{:holder h}` or nothing: one more live session at the
+    owner's door, held by `h`; a sign-in never ends anyone else's;
+  - the empty string with `{:token t}`: that one session ends;
+  - the empty string with `{:holder h}`: every session `h` holds ends;
+  - the empty string alone: every session of the door ends, which is what
+    it always meant.
+  ```
+  [sessions session owner &opt how]
+  (def live (or (get sessions owner) @{}))
+  (put sessions owner live)
+  (def {:holder holder :token token} (or how {}))
+  (cond
+    (present-string? session) (put live session (or holder true))
+    token (put live token nil)
+    holder (eachp [t h] (table/clone live) (when (= h holder) (put live t nil)))
+    (table/clear live))
+  sessions)
 
 (def Settling
   ```

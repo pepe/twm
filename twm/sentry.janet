@@ -1,4 +1,5 @@
 (import ./thicket :prefix "")
+(import ./door :prefix "" :export true)
 
 (setdyn *handler-defines* [:view :conn])
 (defdyn *view* "View for handlers")
@@ -11,14 +12,19 @@
   it opens -- by default this symbiont's own, `session/owner`. A tree
   keeping one session for the whole Thicket ignores it.
   ```
-  [session &opt owner]
+  [session &opt owner how]
   (def context @{})
   (produce/applied
     [(make-update
        (fn [_ state]
          (put context :tree (state :tree))
          (put context :owner (session/owner state))))])
-  (def receipt (:session/new (context :tree) session (or owner (context :owner))))
+  # `how` is said only when there is something to say, so a tree from
+  # before it is asked exactly what it always was.
+  (def receipt
+    (if how
+      (:session/new (context :tree) session (or owner (context :owner)) how)
+      (:session/new (context :tree) session (or owner (context :owner)))))
   (assert (= :applied (get receipt :status)) "Tree did not acknowledge an applied session")
   receipt)
 
@@ -43,6 +49,23 @@
   [& after]
   (apply ^session/new "" (or after [])))
 
+(defn ^session/end-tokens
+  ```
+  Ends exactly the sessions `tokens` of the door `owner`, and proceeds
+  only after Tree confirms each.
+
+  A door may hold several sessions at once, and leaving is one of them
+  leaving: the others stay live. Presenting nothing ends nothing.
+  ```
+  [tokens owner & after]
+  (make-watch
+    (producer
+      (each token tokens
+        (when (present-string? token)
+          (session/publish "" owner {:token token})))
+      (when (present? after) (produce ;after)))
+    "end sessions"))
+
 (defn- guarded/surface
   ```
   The surface `guarded` presents to the outside: the membrane node it
@@ -54,6 +77,49 @@
   (each neighbour (get surface :neighbors [])
     (put surface neighbour (get-in config [:membrane :nodes neighbour :address])))
   surface)
+
+(defn- guardian/identities
+  ```
+  Settles each place a guardian of several identities holds.
+
+  One guardian may be the door of several people, each with an Avatar of
+  their own and each Avatar its own entrance. The place says whose door it
+  is, so the secret asked there is that person's alone, and the session
+  granted there is owned by the place and not by the guardian: signing in
+  as one person must never open another's place.
+
+  Raises, naming the guardian, unless the identities and the places it
+  holds are the same people, every place is an entrance, and no two
+  identities share a key -- a session is derived from the key and the
+  second, so two people sharing one could be handed the same session.
+  ```
+  [sentry identities spaces]
+  (def problems @[])
+  (eachk guarded spaces
+    (unless (get identities guarded)
+      (array/push problems (string guarded " has no identity"))))
+  (eachk person identities
+    (unless (get spaces person)
+      (array/push problems (string person " is not guarded by " sentry))))
+  (each space spaces
+    (unless (get space :entrance false)
+      (array/push problems (string (space :name) " is not an entrance"))))
+  (def held @{})
+  (eachp [person {:secret secret :key key}] identities
+    (unless (and (present-string? secret) (present-string? key))
+      (array/push problems (string person " needs :secret and :key")))
+    (when key
+      (if-let [other (get held key)]
+        (array/push problems (string person " shares a key with " other))
+        (put held key person))))
+  (assert (empty? problems)
+          (string "Guardian " sentry " holds identities wrongly: "
+                  (string/join (sort problems) "; ") "."))
+  (eachp [person space] spaces
+    (def {:secret secret :key key} (identities person))
+    (put space :owner person)
+    (put space :secret secret)
+    (put space :key key)))
 
 (defn =>sentry/initial-state
   ```
@@ -86,10 +152,12 @@
         (<:- t :spaces (fn [&] spaces))
         (fn [config]
           (def entrances (filter |(get $ :entrance false) (values spaces)))
-          (when (not (empty? spaces))
-            (assert (= 1 (length entrances))
-                    (string "Guardian " sentry " must hold exactly one entrance, found "
-                            (length entrances) ".")))
+          (if-let [identities (get-in config [:symbionts sentry :identities])]
+            (guardian/identities sentry identities spaces)
+            (when (not (empty? spaces))
+              (assert (= 1 (length entrances))
+                      (string "Guardian " sentry " must hold exactly one entrance, found "
+                              (length entrances) "."))))
           config)
         (>base t))))
 
@@ -270,6 +338,33 @@
       (produce StandDown))
     "stand down after logout"))
 
+(defn session/presented
+  ```
+  The session tokens `req` presents: every value of its `session` cookie,
+  and the bearer token of its `Authorization` header.
+
+  Read where the request is handled, never inside a capability, so it may
+  use whatever it likes. A logout ends exactly these, and leaves every
+  other session of the door standing.
+  ```
+  [req]
+  (def headers (get req :headers {}))
+  # The cookies are parsed by whichever middleware a route chose, or by
+  # none; a route serving this without one hands over the raw header.
+  (def jar (get headers "Cookie"))
+  (def offered
+    (if (bytes? jar)
+      (let [values (seq [pair :in (string/split "; " jar)
+                         :let [[k v] (string/split "=" pair 0 2)]
+                         :when (= k "session")] v)]
+        (if (one? (length values)) (first values) values))
+      (get jar "session")))
+  (def auth (get headers "Authorization"))
+  @[;(cond (string? offered) [offered] (indexed? offered) offered [])
+    ;(if (and (string? auth) (string/has-prefix? "Bearer " auth))
+       [(string/slice auth 7)]
+       [])])
+
 (defh /logout
   ```
   Clears the current session.
@@ -284,6 +379,10 @@
   (def done (ev/chan 1))
   (def sent (ev/chan 1))
   (def settled (logout/settled done))
+  # Only the sessions this request presents end: the door's others, held
+  # by someone else or elsewhere, stay live.
+  (def presented (session/presented req))
+  (def owner (view :owner))
   (produce (log "logout-request name=" (view :name)
                  " guarded=" (truthy? (view :guards))
                  " own-space=" (truthy? (view :space))
@@ -298,11 +397,11 @@
       # asking rather than by being told: the tree's push reaches whoever
       # it can dial, and a guardian it cannot dial would go on admitting
       # the session it was holding.
-      (^session/end settled)
+      (^session/end-tokens presented owner settled)
       # Signal the response before standing down: StandDown exits this
       # manager after closing the dashboard's address.
-      (^session/end settled
-                    (logout/standdown-after sent))))
+      (^session/end-tokens presented owner settled
+                           (logout/standdown-after sent))))
   (logout/response view done sent))
 
 (defn- session/?offered
@@ -348,6 +447,49 @@
   (if (present-string? key)
     (=<> :headers "Cookie" "session" (session/?offered key))
     (>base false)))
+
+(defn bearer
+  "The `Authorization` header value presenting `token` as a bearer."
+  [token]
+  (string "Bearer " token))
+
+(defn =>session/?live
+  ```
+  Creates a session check function admitting any of the live `tokens`.
+
+  A door may have several sessions at once -- two people, or one person in
+  two places -- and a sign-in adds one rather than replacing the others.
+  `tokens` is keyed by the tokens; what each is mapped to, its holder,
+  does not matter here. The empty string is never a token, so no request
+  that offers nothing is admitted.
+
+  A token may arrive as the `session` cookie, one value or several, as
+  `=>session/?eq` explains, or as `Authorization: Bearer <token>` from an
+  Avatar entering through a door of its own. The header is matched whole
+  against the bearer form of every token, built here, because the check
+  itself is marshalled to whoever holds the place: it may use only what
+  the compiler inlines -- `get`, `=`, iteration -- and slicing the header
+  would take a C function across, which `session/?offered` explains is
+  fatal.
+  ```
+  [tokens]
+  (def live @{})
+  (def bearers @{})
+  (eachk token tokens
+    (when (present-string? token)
+      (put live token true)
+      (put bearers (bearer token) true)))
+  (fn live? [req]
+    (def headers (get req :headers))
+    (var found (get bearers (get headers "Authorization")))
+    (unless found
+      (def offered (get (get headers "Cookie") "session"))
+      (set found (get live offered))
+      (unless found
+        (when offered
+          (each value offered
+            (when (get live value) (set found true))))))
+    (if found true false)))
 
 (defn check-session
   ```
@@ -540,8 +682,11 @@
          (some |(if ($ :entrance) ($ :address))
                (values (get state :spaces {}))))
        (defn view/of [place]
+         # A place of one identity among several carries its own secret,
+         # key and owner, and they win over the guardian's.
          (merge (select-keys state [:name :secret :key])
-                (select-keys place [:guards :public :address :entrance])
+                (select-keys place [:guards :public :address :entrance
+                                    :secret :key :owner])
                 @{:cap/session cap :templates templates :entrance/address entrance
                   # A transition is a constant -- built once and written
                   # verbatim -- so the place it reopens has to be settled
@@ -651,7 +796,7 @@
     (let [sk (derive-from key)]
       (produce (diag "auth-success name=" (view :name)
                      " guards=" guards " session-length=" (length sk)))
-      (session/publish sk)
+      (session/publish sk (view :owner) {:holder "password"})
       (http/stream-with
         (merge <handover/>
                (http/cookie "session"
@@ -789,6 +934,15 @@
       state)
     "assemble sentry"))
 
+(def door/ops
+  ```
+  What a guardian's door asks of the guardian: to publish a session, as a
+  sign-in does, and to hand a place over, as a sign-in does after it.
+  ```
+  {:publish session/publish
+   :handover (fn handover [place]
+               (handover/after-response (place :view) (place :guards)))})
+
 (defn run
   ```
   Runs the shared sentry lifecycle around project templates and start events.
@@ -818,7 +972,7 @@
       (:transact ;before
                  (^prepare-view templates)
                  (^assemble templates rpc-funcs)
-                 (^connect-peers [HTTP start] Exit))
+                 (^connect-peers [HTTP start (^door/open door/ops)] Exit))
       :await))
 
 (defmacro main

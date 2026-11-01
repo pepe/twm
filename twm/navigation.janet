@@ -26,7 +26,10 @@
       (<:- t :build-path (=> :deploy :build-path))
       (>if =>membrane
            (>if (=> =>membrane :rpc)
-                (<:= t (=> =>membrane :rpc |{:membrane/rpc $}))
+                # A guardian's door is its own membrane rpc node, with the
+                # key of the one relation it answers.
+                (<:= t (=> =>membrane |{:membrane/rpc ($ :rpc)
+                                         :membrane/key ($ :key)}))
                 (=> (<:= t =>membrane)
                     (>if (=> =>neighbors present?)
                          (=> (<- c =>neighbors)
@@ -38,6 +41,28 @@
                       |{:public (posix/join (t :build-path) $)})))
       (>base t)
       (>put :build-path nil))))
+
+(defn =>symbiont/crossings
+  ```
+  Navigation to the doors of other Thickets a symbiont may cross to.
+
+  Only a symbiont saying `:crosses true` is given them. Each is a
+  membrane rpc node naming the `:door` it reaches -- `<thicket>/<guardian>`
+  -- with that relation's `:key` and the `:address` of the place the door
+  opens; the symbiont gets them keyed by the door. A Thicket speaks to
+  another only through its Membrane, so the address and the key are in the
+  caller's own configuration, and nothing about the caller is in the
+  other's.
+  ```
+  [symbiont]
+  (fn [config]
+    (if (get-in config [:symbionts symbiont :crosses])
+      {:crossings
+       (tabseq [node :in (values (get-in config [:membrane :nodes] {}))
+                :when (get node :door)]
+         (node :door) {:rpc (node :rpc) :key (node :key)
+                       :address (node :address)})}
+      {})))
 
 (defn =>symbiont/image
   "Navigation to a symbiont's persisted image."
@@ -81,6 +106,7 @@
         (<:= t (=>symbiont/mycelium symbiont))
         (<:= t (=>symbiont/membrane symbiont))
         (<:= t (=>symbiont/image symbiont))
+        (<:= t (=>symbiont/crossings symbiont))
         (<:= t (=>demiurge/initial-state symbiont))
         (<:= t (sentry/=>sentry/initial-state symbiont))
         (>base t))))
