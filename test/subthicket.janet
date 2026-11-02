@@ -454,4 +454,64 @@
 (assert (string/find "parent generation 1 exited: 0" (top-log)) "the parent left by itself")
 (end-suite)
 
+# A release that reads the configuration again, asked of the child through
+# its parent's door as a ToT asks it: the peer is stopped under the key it
+# holds and raised under the new one, and nobody is killed for it.
+(def psk/new "new-psk-new-psk-new-psk-new-psk-")
+
+(defn child-log [] (slurp (path/join child-dir "data" "demiurge.log")))
+
+(defn finished
+  "The receipt of the child's operation `id` once it has ended, asked through the door."
+  [door-psk id]
+  (var receipt nil)
+  (eventually |(do (set receipt (call (ports :door) door-psk :operation id))
+                   (index-of (get receipt :status) [:completed :failed]))
+              30)
+  receipt)
+
+(start-suite :reconfigure)
+(lay-out)
+(os/mkdir (path/join child-dir "_release"))
+(def parent (raise-herd))
+(def door-psk (subthicket/psk psk/parent :child))
+(def first-sleeper (get (herd) 1))
+(spit (path/join child-dir "conf.jdn")
+      (string/format "%j" (merge child-config
+                                 {:mycelium (merge (child-config :mycelium) {:psk psk/new})})))
+(def plain (call (ports :door) door-psk :release))
+(assert (= :completed ((finished door-psk (plain :id)) :status)) "a plain release completes")
+(assert (= :pong (call (ports :sleeper) psk/child :ping))
+        "and leaves the peer under the key its Demiurge started with")
+(def receipt (call (ports :door) door-psk :release "reconfigure"))
+(assert (= :accepted (receipt :status)) "a release reading the configuration again is accepted")
+(assert (= :completed ((finished door-psk (receipt :id)) :status)) "and completes")
+(assert (eventually |(= :pong (call (ports :sleeper) psk/new :ping)))
+        "the peer is raised under the new key")
+(assert (match (call (ports :sleeper) psk/child :ping) [:failed _] true) "and refuses the old")
+(assert (not= first-sleeper (get (herd) 1)) "a new process")
+(assert (match (call (ports :child) psk/new :state) [:running _ _] true)
+        "the child's own door takes the new key")
+(assert (match (call (ports :child) psk/child :state) [:failed _] true) "and refuses the old")
+(assert (not (string/find "did not exit" (child-log))) "nobody is killed on the way")
+(assert (not (string/find "could not connect" (child-log))) "and every peer is reached")
+(def second-sleeper (get (herd) 1))
+(spit (path/join child-dir "conf.jdn")
+      (string/format "%j" (merge child-config
+                                 {:mycelium (merge (child-config :mycelium) {:psk psk/new})
+                                  :deploy (merge (child-config :deploy)
+                                                 {:release-path (path/join child-dir "elsewhere")})})))
+(def asked (call (ports :door) door-psk :release :reconfigure))
+(def refused (finished door-psk (get asked :id)))
+(assert (= :failed (refused :status)) "a configuration changing the Demiurge's own paths is refused")
+(assert (string/find "release-path" (refused :failure)) "naming what only a restart changes")
+(assert (= second-sleeper (get (herd) 1)) "before anything is stopped")
+(assert (= :pong (call (ports :sleeper) psk/new :ping)) "so the peer goes on answering")
+(def pids (herd))
+(call (ports :parent) psk/parent :stop)
+(assert (eventually |(gone? pids) quick) "and the herd still goes when asked")
+(os/proc-wait parent)
+(assert (not (string/find "did not exit" (parent-log))) "without anyone killed")
+(end-suite)
+
 (rm-tree root)

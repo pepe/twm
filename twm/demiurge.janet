@@ -2,6 +2,7 @@
 (import ./lifecycle)
 (import ./operation :export true)
 (import ./artifact :export true)
+(import ./schema)
 (import gp/atomic :export true)
 (import gp/ownership)
 (import jhydro)
@@ -857,8 +858,126 @@
         (unless (= :completed (receipt :status)) (os/exit 1))))
     "peer maintenance command"))
 
+(def- config/given
+  ```
+  The file this Demiurge's configuration was read from, as `CONF` named it
+  when it started, made absolute there: it moves into its checkout later,
+  and `CONF` is lent to every build in the meantime.
+  ```
+  (when-let [given (os/getenv "CONF")] (path/abspath given)))
+
+(defn config/file
+  "The file this Demiurge reads its configuration from: `CONF`, else `conf.jdn` in its checkout."
+  [state]
+  (or config/given (path/join (state :build-path) "conf.jdn")))
+
+(defn config/reread
+  ```
+  This Demiurge's configuration, read again from its file, if a release
+  can take it.
+
+  Every peer is built from the configuration, so a release takes whatever
+  changed for them. The Demiurge's own part -- its paths, its doors, its
+  peers' addresses, what it builds and raises -- holds the very machinery
+  doing the releasing, and only a restart changes it; read again with such
+  a change, it is refused, naming the keys, before anything is stopped.
+  The mycelium `:psk` is the one exception: the peers are stopped under
+  the key they hold, and raised under the new one. Not when a subthicket
+  is among them, whose own door key is hashed from it.
+
+  Says which keys changed, never their values.
+  ```
+  [state]
+  (def file (config/file state))
+  (def [read fresh] (protect (parse (slurp file))))
+  (assert read (string/format "Cannot read the configuration %s" file))
+  (assert (schema/config? fresh)
+          (string/format "The configuration %s is not a thicket's configuration" file))
+  # A navigation fills one table of its own each time it is walked, so each
+  # side is walked by a navigation of its own.
+  (defn own [config] (((state :nav/symbiont) :demiurge) config))
+  (def [before after] [(own (state :config)) (own fresh)])
+  (def changed (filter |(not (deep= (get before $) (get after $)))
+                       (distinct [;(keys before) ;(keys after)])))
+  (def fixed (sorted (filter |(not= :psk $) changed)))
+  (assert (empty? fixed)
+          (string "Only a restart changes the Demiurge's own "
+                  (string/join (map string fixed) ", ")))
+  (when (index-of :psk changed)
+    (assert (not (some |(peer/subthicket state $) (or (state :builds) [])))
+            "Only a restart changes the :psk of a Demiurge with subthickets"))
+  fresh)
+
+(defn ^config/take
+  "Makes `config` the one every peer is built and raised from."
+  [config]
+  (make-update (fn [_ state] (put state :config config)) "take the configuration"))
+
+(defn ^psk/take
+  ```
+  Makes `psk` the key the Demiurge speaks to its peers with, and opens its
+  own mycelium again under it.
+
+  A peer's line is opened with the key when the peer is connected, so the
+  lines to the peers already stopped go with them. The Demiurge's own
+  listener was given the key when it opened, so it is closed and opened
+  again; a connection it accepted before -- the one asking for the release,
+  perhaps -- is answered to its end.
+  ```
+  [psk]
+  (make-event
+    {:update (fn [_ state] (put state :psk psk))
+     :watch
+     (fn [_ state _]
+       (when-let [held ((space/held state) :rpc)
+                  listener (held :listener)]
+         (server/close listener)
+         (put held :listener nil)
+         (^space/rpc state psk (state :debug))))}
+    "take the mycelium key"))
+
+(defn- release
+  ```
+  Builds, stops, installs and raises again, as `maintain` describes; with
+  `fresh`, a configuration read again by `config/reread`, the peers are
+  built from it and raised under it.
+
+  It is taken before the build, which is where every peer's configuration
+  comes from, and given back if the build fails, while every peer still
+  runs as it was. Its key is taken only once the peers are stopped,
+  because they are asked to stop under the one they hold.
+  ```
+  [state record ran &opt fresh]
+  (def held [(state :config) (state :psk)])
+  (operation/step record :preparing [(^mark-release (os/time))
+                                    (^save-sha (string ($<_ git rev-parse HEAD)))])
+  (when fresh (operation/step record :configuring [(^config/take fresh)]))
+  (when (and (state :builder) (not (state :dry)))
+    (def [built err] (protect (operation/step record :building [Build])))
+    (unless built
+      (when fresh (operation/step record :building [(^config/take (first held))]))
+      (error err)))
+  (operation/step record :stopping [StopPeers])
+  (peers/await-exit state)
+  (def psk (get-in state [:config :mycelium :psk]))
+  (when (and fresh (not= psk (last held)))
+    (operation/step record :stopping [(^psk/take psk)]))
+  (when (and (state :builder) (not (state :dry)))
+    (operation/step record :installing [Deploy]))
+  (operation/step record :recording [SetReleasedSHA])
+  (when ran
+    (operation/step record :starting [RunPeers])
+    (peers/await-ready state (state :autostart)))
+  (operation/step record :ready [Ready]))
+
 (defn maintain
-  "Performs thicket maintenance without advancing past a failed or unfinished step."
+  ```
+  Performs thicket maintenance without advancing past a failed or unfinished step.
+
+  `:release` builds every peer, stops them, installs what was built and
+  raises them again. `:release/reconfigure` is the same release from the
+  configuration read again; see `config/reread`.
+  ```
   [state record kind]
   (def ran (get-in state [:view :ran]))
   (case kind
@@ -876,21 +995,8 @@
         (peers/await-exit state)
         (operation/step record :starting [RunPeers])
         (peers/await-ready state (state :autostart)))
-    :release
-    (do
-      (operation/step record :preparing [(^mark-release (os/time))
-                                        (^save-sha (string ($<_ git rev-parse HEAD)))])
-      (when (and (state :builder) (not (state :dry)))
-        (operation/step record :building [Build]))
-      (operation/step record :stopping [StopPeers])
-      (peers/await-exit state)
-      (when (and (state :builder) (not (state :dry)))
-        (operation/step record :installing [Deploy]))
-      (operation/step record :recording [SetReleasedSHA])
-      (when ran
-        (operation/step record :starting [RunPeers])
-        (peers/await-ready state (state :autostart)))
-      (operation/step record :ready [Ready]))
+    :release (release state record ran)
+    :release/reconfigure (release state record ran (config/reread state))
     (error (string "Unknown maintenance operation " kind))))
 
 (defn ^release
@@ -989,9 +1095,15 @@
   (operation/status view (first args)))
 
 (defr +:release
-  "RPC function, that starts the release if possible."
+  ```
+  RPC function, that starts the release if possible. Asked with
+  `reconfigure`, as a keyword or a string, it releases from the
+  configuration read again; see `config/reread`.
+  ```
   [guard-releasing]
-  (operation/submit :release |(maintain $0 $1 :release)))
+  (def kind (if (index-of (first args) [:reconfigure "reconfigure"])
+              :release/reconfigure :release))
+  (operation/submit kind |(maintain $0 $1 kind)))
 
 (defr +:stop-peers
   "RPC function, that stops the peers if possible."
