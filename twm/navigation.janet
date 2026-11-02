@@ -48,8 +48,9 @@
 
   Only a symbiont saying `:crosses true` is given them. Each is a
   membrane rpc node naming the `:door` it reaches -- `<thicket>/<guardian>`
-  -- with that relation's `:key` and the `:address` of the place the door
-  opens; the symbiont gets them keyed by the door. A Thicket speaks to
+  -- with that relation's `:key`, the `:address` of the place the door
+  opens and, when given, the `:title` its Thicket goes by; the symbiont
+  gets them keyed by the door. A Thicket speaks to
   another only through its Membrane, so the address and the key are in the
   caller's own configuration, and nothing about the caller is in the
   other's.
@@ -60,7 +61,7 @@
       {:crossings
        (tabseq [node :in (values (get-in config [:membrane :nodes] {}))
                 :when (get node :door)]
-         (node :door) {:rpc (node :rpc) :key (node :key)
+         (node :door) {:rpc (node :rpc) :key (node :key) :title (node :title)
                        :address (node :address)})}
       {})))
 

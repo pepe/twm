@@ -173,3 +173,17 @@
 (assert (nil? (((=>symbiont/initial-state :matej) crossing) :crossings))
         "one that does not, gets none")
 (end-suite)
+
+(start-suite :crossing-title)
+(def titled (config))
+(put-in titled [:symbionts :dan :crosses] true)
+(put-in titled [:membrane :nodes :winter26/admin-sentry]
+        @{:rpc "localhost:9" :key "k" :door "winter26/admin-sentry"
+          :address "https://admin.winter26.example" :title "Winter 26"})
+(assert (= "Winter 26" (get-in ((=>symbiont/initial-state :dan) titled)
+                               [:crossings "winter26/admin-sentry" :title]))
+        "a crossing carries the title its Thicket goes by")
+(import ../twm/schema :as schema)
+(assert (schema/config/membrane/rpc-node? (get-in titled [:membrane :nodes :winter26/admin-sentry]))
+        "and the schema knows it")
+(end-suite)
