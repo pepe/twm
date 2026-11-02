@@ -74,4 +74,21 @@
                  {:door "archive/viewer-sentry" :capability :viewer}]
                (baskak/grants (baskak :grants) :dan)))
 (assert (empty? (baskak/grants (baskak :grants) :eve)))
+(def defaulted [{:avatar :dan :door "interstudy/dan-sentry" :admin true :default true}
+                {:avatar :dan :door "archive/viewer-sentry" :viewer true}])
+(assert (deep= @[{:door "interstudy/dan-sentry" :capability :admin :default true}
+                 {:door "archive/viewer-sentry" :capability :viewer}]
+               (baskak/grants defaulted :dan))
+        "a default grant is one door, marked, and :default is no capability")
+(end-suite)
+
+(start-suite :baskak-default)
+(put baskak :grants [{:avatar :dan :door "interstudy/dan-sentry" :admin true :default true}])
+(assert (dictionary? (ask {:avatar :dan :session "dan-session"
+                           :door "interstudy/dan-sentry" :capability :admin}))
+        "a default grant warrants its capability")
+(assert (= [:refused :grant]
+           (ask {:avatar :dan :session "dan-session"
+                 :door "interstudy/dan-sentry" :capability :default}))
+        "but never :default itself")
 (end-suite)

@@ -15,23 +15,31 @@
   A grant names its capability as a flag, exactly as a symbiont names its
   role, and only a flag set to `true` counts. So a viewer's grant can
   never be stretched to warrant `:admin`: a Yarlyk must not justify a
-  stronger consequence than the one it was issued for.
+  stronger consequence than the one it was issued for. `:default` is a
+  flag too, but it marks the door an Avatar opens first and is no
+  capability: it warrants nothing.
   ```
   [grants avatar door capability]
   (find |(and (= avatar ($ :avatar))
               (= door ($ :door))
               (keyword? capability)
+              (not= :default capability)
               (true? (get $ capability)))
         grants))
 
 (defn baskak/grants
-  "The doors `avatar` holds a grant for, each as `{:door :capability}`."
+  ```
+  The doors `avatar` holds a grant for, each as `{:door :capability}`,
+  and with `:default true` when its grant marks it the door the Avatar
+  opens first.
+  ```
   [grants avatar]
   (seq [grant :in grants
         :when (= avatar (grant :avatar))
         [k v] :pairs grant
-        :when (true? v)]
-    {:door (grant :door) :capability k}))
+        :when (and (true? v) (not= :default k))]
+    {:door (grant :door) :capability k
+     :default (if (true? (grant :default)) true)}))
 
 (defn baskak/warrant
   ```
