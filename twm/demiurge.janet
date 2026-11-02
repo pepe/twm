@@ -126,6 +126,23 @@
   [psk peer]
   (string (jhydro/hash/hash 32 (string psk "\0" peer) "twmsubth")))
 
+(defn client/reopened
+  ```
+  `client`, opened again first if it has lost its line.
+
+  A call cut by its deadline -- one that lands while the other end's
+  event loop is busy, as a subthicket's is compiling in a release --
+  discards the client's connection, and from then on every call on it
+  fails with "RPC connection closed". The client is opened once, when its
+  peer is connected, so without this a line lost once stays lost: the
+  parent of metabolon-staging could not ask it of anything for a day, nor
+  stop it, and a restart of the whole ToTs waited out its budget.
+  ```
+  [client]
+  (when (and (table? client) (nil? (client :exchange)))
+    (protect (ev/with-deadline 1 (:open client))))
+  client)
+
 (defn peer/url
   "The address the Demiurge reaches `peer` on."
   [state peer]
@@ -349,6 +366,19 @@
           (unless ok (produce (log "Cannot end " peer ": " err))))))
     (. "insist " peer)))
 
+(defn- subthicket/terminate
+  ```
+  Asks the subthicket `peer` to go by SIGTERM, which its Demiurge takes as
+  `Leave`, when the request over its door could not be made.
+
+  Not on Windows, where there is no SIGTERM to send, only a kill, and
+  `^peer/insist` is the one to kill.
+  ```
+  [peer]
+  (def proc (peer/running peer))
+  (when (and proc (not= :windows (os/which)))
+    (first (protect (os/proc-kill proc false :term)))))
+
 (defn ^peer/stop
   "Requests departure without releasing ownership before the process is reaped."
   [peer]
@@ -358,12 +388,16 @@
      (fn [_ state _]
        (def generation ((lifecycle/record state peer) :generation))
        (def pc (state peer))
+       (def sub (peer/subthicket state peer))
        [(^peer/insist peer generation)
         (make-watch
           (producer
             (when (dictionary? pc)
-              (def [ok err] (protect (:stop pc)))
-              (unless ok (produce (log "Stop request for " peer " failed: " err)))
+              (def [ok err] (protect (:stop (client/reopened pc))))
+              (unless ok
+                (produce (log "Stop request for " peer " failed: " err))
+                (when (and sub (subthicket/terminate peer))
+                  (produce (log "Asked " peer " to go by SIGTERM instead"))))
               (protect (:close pc)))))] )}
     (. "stop peer " peer)))
 
@@ -609,7 +643,8 @@
       (def generation ((lifecycle/record state peer) :generation))
       (def client (state peer))
       (producer
-        (def [ok answer] (protect (ev/with-deadline ping/patience (:ping client))))
+        (def [ok answer] (protect (ev/with-deadline ping/patience
+                                    (:ping (client/reopened client)))))
         (produce
           (make-update
             (fn [_ state]

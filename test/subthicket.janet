@@ -336,6 +336,44 @@
   (assert (eventually |(gone? pids) quick) "SIGTERM stops the whole herd gracefully")
   (assert (= 0 (os/proc-wait parent)) "and the parent exits as asked, not killed")
   (assert (not (string/find "did not exit" (parent-log))) "with nobody killed on the way")
+  (end-suite)
+
+  # A child busy for longer than a ping's patience -- frozen here, compiling
+  # in a release on the box -- has its parent's ping cut by the deadline,
+  # and the cut takes the parent's only line to it along.
+  (defn sigstop [pid] (os/execute ["kill" "-STOP" (string pid)] :p))
+  (defn sigcont [pid] (os/execute ["kill" "-CONT" (string pid)] :p))
+
+  (start-suite :line-lost)
+  (lay-out)
+  (def parent (raise-herd))
+  (def pids (herd))
+  (sigstop (first pids))
+  (ev/sleep 6)
+  (sigcont (first pids))
+  (ev/sleep 3)
+  (call (ports :parent) psk/parent :stop)
+  (assert (eventually |(gone? pids) quick)
+          "a parent that lost its line to the child opens it again, and the child is asked to go")
+  (os/proc-wait parent)
+  (assert (not (string/find "Stop request for child failed" (parent-log))) "the request arrives")
+  (assert (not (string/find "did not exit" (parent-log))) "and nobody is killed")
+  (end-suite)
+
+  (start-suite :stop-undelivered)
+  (lay-out)
+  (def parent (raise-herd))
+  (def pids (herd))
+  (sigstop (first pids))
+  (call (ports :parent) psk/parent :stop)
+  (assert (eventually |(string/find "Stop request for child failed" (parent-log)) quick)
+          "a stop asked of a child that cannot answer fails")
+  (sigcont (first pids))
+  (assert (eventually |(gone? pids) quick)
+          "and the child is asked by SIGTERM instead, and goes long before its budget")
+  (os/proc-wait parent)
+  (assert (string/find "Asked child to go by SIGTERM instead" (parent-log)))
+  (assert (not (string/find "did not exit" (parent-log))) "without being killed")
   (end-suite))
 
 # Three levels: a top Demiurge over the parent, over the child, over its
