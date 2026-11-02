@@ -136,9 +136,28 @@
     {:row (+ top r) :from from :to (+ from (tui/line-width (line c)))
      :choice i}))
 
+(def- aside/room
+  "Columns the console keeps at the least before an aside is drawn beside it."
+  44)
+
+(defn aside/width
+  ```
+  The columns of `cols` the console keeps when the lines `aside` are
+  drawn beside it, or nil when they leave it too few. The aside takes
+  its widest line and a margin, the rule between them two more.
+  ```
+  [aside cols]
+  (when (present? aside)
+    (def left (- cols (max ;(map tui/line-width aside)) 4))
+    (if (>= left aside/room) left)))
+
 (defn- render [state]
   (def {:term term :app app :view view :editor ed} state)
-  (def [rows cols] (tui/size))
+  (def [rows all] (tui/size))
+  (def aside (if-let [f (app :aside)] (f view)))
+  (def left (aside/width aside all))
+  (def cols (or left all))
+  (put state :left cols)
   (def [live cursor] (tui/editor/render ed cols))
   (def blocks ((get app :render (fn [&] [])) view cols))
   (each b blocks
@@ -172,7 +191,11 @@
   # Where things are drawn, for a click to tell what it fell on.
   (put state :spans (spans state (length live)))
   (put state :flex [(laid :top) (laid :height)])
-  (tui/present term (laid :lines) (if (state :input?) cursor)))
+  (tui/present term
+               (if left
+                 (tui/beside (laid :lines) (slice aside 0 (min rows (length aside))) left)
+                 (laid :lines))
+               (if (state :input?) cursor)))
 
 (def- Render (make-effect (fn [_ state _] (render state)) "handle render"))
 
@@ -302,11 +325,14 @@
 (defn- quit [state]
   ((state :leave) (state :term) 0))
 
-(defn- leave-quick
-  "Leaves the line a quick key began."
+(def- editor/opts
+  "The live line: Enter or Ctrl+Enter submits it, Alt+Enter breaks it."
+  {:prompt "> " :submit [:enter :ctrl-enter] :newline [:alt-enter]})
+
+(defn- leave-line
+  "Leaves the line, done or cancelled, for the dashboard to have the keys."
   [state]
-  (put state :input? false)
-  (put state :quick nil))
+  (put state :input? false))
 
 (defn- quick-line
   "The line the quick key `text` begins, by the app's `:quick` as it stands."
@@ -343,19 +369,18 @@
                (put state :input? true)
                (set changed true))
              (when-let [click (get-in state [:app :click])
-                        _ (and (<= top r) (< r (+ top height)))
+                        _ (and (<= top r) (< r (+ top height))
+                               (< c (get state :left (inc c))))
                         line (click (state :view) (+ (- r top) (get state :scroll 0)))]
                (set submitted [line false]))))
          (and (state :input?) (= key :tab))
-         # Tab picks a button of the cloud, Tab again the next one and
-         # Shift+Tab the one before; the line is left as it is.
-         (when-let [offered (choices state)]
-           (def n (length offered))
-           (put state :choice
-                (cond
-                  choice (% (+ choice (if (k :shift) (dec n) 1)) n)
-                  (k :shift) (dec n)
-                  0)))
+         # Tab takes the focus from the line to the cloud, its first
+         # button, and on to the next one; Shift+Tab gives it back to the
+         # line. The line is left as it is.
+         (if (k :shift)
+           (put state :choice nil)
+           (when-let [offered (choices state)]
+             (put state :choice (if choice (% (inc choice) (length offered)) 0))))
          (and choice (or (= key :enter) (= " " (k :text))))
          # Space or Enter takes the picked one into the line, as a click.
          (do
@@ -367,23 +392,24 @@
          (do
            (put state :choice nil)
            (cond
-             # A line a quick key began is the key's: Esc takes it away.
-             (and (= key :esc) (state :quick))
+             # Esc cancels the line, and the dashboard has the keys again.
+             (= key :esc)
              (do (tui/editor/set ed "")
-               (leave-quick state)
+               (leave-line state)
                (set changed true))
-             (= key :esc) (put state :input? false)
-             (case (if (and (state :quick) (= key :enter)) :submit
-                     (tui/editor/key ed k cols))
-               :submit (do (set submitted [(tui/editor/text ed) (truthy? (k :shift))])
+             (case (tui/editor/key ed k (get state :left cols))
+               # Enter submits a line that says anything, and the
+               # dashboard has the keys again.
+               :submit (when (present? (string/trim (tui/editor/text ed)))
+                         (set submitted [(tui/editor/text ed) (truthy? (k :shift))])
                          (tui/editor/submit ed)
-                         (if (state :quick) (leave-quick state)))
+                         (leave-line state))
                :changed (set changed true))))
          (and (= key :char) (quick-line state (k :text)))
          # A quick key begins its line, and Enter alone submits it.
          (do
            (tui/editor/set ed (quick-line state (k :text)))
-           (merge-into state {:input? true :quick true})
+           (put state :input? true)
            (set changed true))
          (case [key (k :text)]
            [:char "q"] (quit state)
@@ -425,7 +451,11 @@
     asked at every key, for quick keys that change with what the app is
     doing,
   * `:click` -- `(fn [view i])` returning the line a left click on the
-    line `i` of the scrolled block submits, or nil when it does nothing.
+    line `i` of the scrolled block submits, or nil when it does nothing,
+  * `:aside` -- `(fn [view])` returning lines to draw beside everything
+    else, top to bottom, when the terminal is wide enough for both; the
+    rest is then drawn in the columns left of them. Nothing of it is
+    clicked or scrolled.
 
   What `:explain` and `:submit` return is a line: a string, or pieces as
   gp/tui draws them. `:explain` can give more lines as `{:lines lines}`,
@@ -433,13 +463,14 @@
   `text` that the piece `col` of the line `row` leaves, as a button of
   the cloud does.
 
-  Ctrl+Enter or Alt+Enter submits, Enter breaks the line. Tab picks one
-  of the choices and Tab again the next, Space or Enter takes the picked
-  one into the line, Esc lets it go. Esc leaves the line and `i` comes
-  back. Outside it j/k, arrows, PgUp/PgDn and the wheel
-  scroll, q quits; Ctrl+C quits anywhere. A key of `:quick` begins its
-  line there: Enter alone submits it, and the line is left again then,
-  or with Esc, which takes it away. A left click on a button of the
+  Enter or Ctrl+Enter submits the line, unless it is blank, and leaves
+  it; Alt+Enter breaks it. Esc cancels the line: it is emptied and left.
+  Tab takes the focus to the choices, the first of them, and Tab again
+  to the next; Space or Enter takes the picked one into the line, and
+  Shift+Tab or Esc give the focus back to the line. Out of the line, `i`
+  comes back to it, j/k, arrows, PgUp/PgDn and the wheel scroll, q
+  quits; Ctrl+C quits anywhere. A key of `:quick` begins its line
+  there, with what it begins already typed. A left click on a button of the
   cloud takes it into the line, as Tab and Enter do, and one on a line
   of the scrolled block submits what `:click` makes of it.
   ```
@@ -457,7 +488,7 @@
     (def term (tui/open))
     (def state @{:config config :app app :term term :leave leave
                  :view @{} :online false :message nil
-                 :editor (tui/make-editor {:prompt "> "})
+                 :editor (tui/make-editor editor/opts)
                  :input? true :scroll 0})
     (defn on-error [_ err]
       (match err
