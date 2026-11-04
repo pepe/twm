@@ -546,6 +546,38 @@ dynamics as set by *rpc-defines*.```
                                        "Cache-Control" "no-cache"}))}
     {}))
 
+(def- door/token-grammar
+  "A door's session as a form posts it: `token=` and 64 hex digits."
+  (peg/compile ~(* "token=" (<- (repeat 64 :h)) (any (set "\r\n")) -1)))
+
+(defn door/open-route
+  ```
+  The route opening a place in a window of its own, `/_door/open`, when
+  its membrane names `:origins` an Avatar may come from; none otherwise.
+
+  An Avatar posts it a session one of its doors gave -- never in a URL,
+  which a history, a log or a referrer would keep. It is answered with
+  that session as the place's `session` cookie and sent to the place's
+  root, so the window is the place's own page, signed in as a door
+  session is. Nothing is checked here: a cookie opens only what the
+  session it carries still opens, and a dead one leaves the window at
+  the guardian's form. The cookie is host-only, as a sign-in's is.
+  ```
+  [space]
+  (if (present? (space :origins))
+    {"/_door/open"
+     (http/dispatch
+       {"POST"
+        (fn door-open [req]
+          (def address (or (space :address) "/"))
+          (if-let [[token] (peg/match door/token-grammar (string (or (req :body) "")))]
+            (http/response 303 ""
+                           (merge @{"Location" address "Content-Length" 0}
+                                  (http/cookie "session"
+                                               (string token "; Secure; HttpOnly; Path=/;"))))
+            (http/see-other address)))})}
+    {}))
+
 (defn ^space/http
   ```
   Producer running the HTTP server of one living `space`.
@@ -571,7 +603,8 @@ dynamics as set by *rpc-defines*.```
                                    (json/encode (readiness/status (space :view)))
                                    {"Content-Type" "application/json"
                                     "Cache-Control" "no-store"}))}
-                     (door/css-route space)))
+                     (door/css-route space)
+                     (door/open-route space)))
   (def parser
     (http/parser
       (cond-> routes
