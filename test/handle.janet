@@ -156,6 +156,41 @@
         "a click beside the console, on the aside, does nothing")
 (end-suite)
 
+(start-suite :handle-hold)
+(def- b {:key :char :text "b"})
+(defn- hold
+  "Holds `k` on `state` for `secs`, repeating it as a terminal does, and
+  returns what was submitted."
+  [state k secs]
+  (var submitted nil)
+  (repeat (math/ceil (/ secs 0.05))
+    (ev/sleep 0.05)
+    (if-let [w (press state k)] (set submitted w)))
+  submitted)
+(def state @{:app {:quick {"b" "/b" "3" "3"} :hold {"b" true}}
+             :input? false :editor (editor)})
+(press state b)
+(assert (and (state :input?) (= "/b" (line state)) (nil? (hold state b 0.5)))
+        "a held key is not typed again, nor submitted before its time")
+(assert (indexed? (hold state b 0.4)) "held long enough, it submits its line")
+(assert (and (not (state :input?)) (= "" (line state))) "and leaves it")
+(hold state b 0.5)
+(assert (and (not (state :input?)) (= "" (line state)))
+        "its repeats after are let go")
+(ev/sleep 0.4)
+(press state b)
+(assert (and (state :input?) (= "/b" (line state))) "pressed again it begins its line")
+(press state {:key :esc})
+(press state b)
+(ev/sleep 0.8)
+(assert (and (nil? (press state b)) (state :input?) (= "/b" (line state)))
+        "let go and pressed again, it is not held")
+(press state {:key :esc} {:key :char :text "3"})
+(hold state {:key :char :text "3"} 0.1)
+(assert (and (state :input?) (= "333" (line state)))
+        "a quick key not of `:hold` is typed again as it repeats")
+(end-suite)
+
 (start-suite :handle-aside)
 (def aside ["TODAY" "Tracked     2h 14m"])
 (assert (= 58 (handle/aside/width aside 80))

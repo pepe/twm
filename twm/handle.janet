@@ -334,11 +334,28 @@
   [state]
   (put state :input? false))
 
+(defn- asked
+  "The app's table `k` as it stands, asked of it when it is a function."
+  [state k]
+  (def t (get-in state [:app k]))
+  (if (function? t) (t) t))
+
 (defn- quick-line
   "The line the quick key `text` begins, by the app's `:quick` as it stands."
   [state text]
-  (def quick (get-in state [:app :quick]))
-  (get (if (function? quick) (quick) quick) text))
+  (get (asked state :quick) text))
+
+(def- hold/secs
+  "Seconds a quick key of the app's `:hold` is held before its line is submitted."
+  0.75)
+
+(def- hold/repeat
+  ```
+  Seconds at most between one repeat of a held key and the next. The
+  terminal says nothing of a key let go, so a key is held while its
+  repeats keep coming.
+  ```
+  0.25)
 
 (defn- ^key [k]
   (def key (k :key))
@@ -351,8 +368,26 @@
        (def page (max 1 (- rows 10)))
        (def ed (state :editor))
        (def choice (state :choice))
+       (def now (os/clock :monotonic))
+       (def hold (state :hold))
+       (def again (and hold (= key :char) (= (k :text) (hold :text))))
+       (def repeating (and again (< (- now (hold :last)) hold/repeat)))
+       (unless again (put state :hold nil))
        (cond
          (= key :ctrl-c) (quit state)
+         # The repeats of a key held past its submit are let go.
+         (and repeating (hold :fired)) (put hold :last now)
+         (and again (not (hold :fired)) (state :input?)
+              (= (hold :line) (tui/editor/text ed)))
+         # A held quick key is not typed again, and held long enough it
+         # submits its line, as Enter does.
+         (do
+           (put hold :last now)
+           (when (and repeating (>= (- now (hold :since)) hold/secs))
+             (put hold :fired true)
+             (set submitted [(tui/editor/text ed) false])
+             (tui/editor/submit ed)
+             (leave-line state)))
          (= key :wheel) (update state :scroll + (* 3 (k :dy)))
          (= key :mouse)
          # A left click on a button of the cloud takes it into the line,
@@ -406,9 +441,13 @@
                          (leave-line state))
                :changed (set changed true))))
          (and (= key :char) (quick-line state (k :text)))
-         # A quick key begins its line, and Enter alone submits it.
+         # A quick key begins its line, and Enter alone submits it. One
+         # of `:hold` is followed, to be held.
          (do
-           (tui/editor/set ed (quick-line state (k :text)))
+           (def line (quick-line state (k :text)))
+           (tui/editor/set ed line)
+           (put state :hold (if (get (asked state :hold) (k :text))
+                              @{:text (k :text) :line line :since now :last now}))
            (put state :input? true)
            (set changed true))
          (case [key (k :text)]
@@ -450,8 +489,12 @@
     and Enter submit `/b3`. A function `(fn [])` returning the table is
     asked at every key, for quick keys that change with what the app is
     doing,
+  * `:hold` -- a table whose keys are quick keys that submit their line
+    when held, or a function returning it, asked as `:quick` is,
   * `:click` -- `(fn [view i])` returning the line a left click on the
     line `i` of the scrolled block submits, or nil when it does nothing,
+  * `:mouse` -- false to leave the mouse to the terminal, to select
+    with: nothing is clicked then, and the wheel is the terminal's,
   * `:aside` -- `(fn [view])` returning lines to draw beside everything
     else, top to bottom, when the terminal is wide enough for both; the
     rest is then drawn in the columns left of them. Nothing of it is
@@ -470,9 +513,10 @@
   Shift+Tab or Esc give the focus back to the line. Out of the line, `i`
   comes back to it, j/k, arrows, PgUp/PgDn and the wheel scroll, q
   quits; Ctrl+C quits anywhere. A key of `:quick` begins its line
-  there, with what it begins already typed. A left click on a button of the
-  cloud takes it into the line, as Tab and Enter do, and one on a line
-  of the scrolled block submits what `:click` makes of it.
+  there, with what it begins already typed; one of `:hold` held for
+  `hold/secs` submits it. A left click on a button of the cloud takes it
+  into the line, as Tab and Enter do, and one on a line of the scrolled
+  block submits what `:click` makes of it.
   ```
   [config app]
   # What is said on stderr while the alternate screen is up would leave
@@ -485,7 +529,7 @@
     (file/flush stderr*)
     (os/exit code))
   (with-dyns [:err said]
-    (def term (tui/open))
+    (def term (tui/open {:mouse (get app :mouse true)}))
     (def state @{:config config :app app :term term :leave leave
                  :view @{} :online false :message nil
                  :editor (tui/make-editor editor/opts)
