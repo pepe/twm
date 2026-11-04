@@ -418,9 +418,11 @@ dynamics as set by *rpc-defines*.```
   A stream writes its head straight to its connection, so the only way to
   add to it is to be the connection: the head ends with the first empty
   line, and the lines go in just before it. Everything after passes
-  through untouched. Only `:write`, `:flush` and `:close` are asked of a
+  through untouched. `:write`, `:flush` and `:close` are asked of a
   connection by the responses gp writes, as gp's own `sse-writer` relies
-  on.
+  on, and `:read` by a live stream watching for its reader to go
+  (`view/stream`): without it, every stream through a door took its
+  reader for gone and ended after its first drawing.
   ```
   [conn lines]
   (var pending true)
@@ -436,6 +438,7 @@ dynamics as set by *rpc-defines*.```
                    (:write conn s)))
                (:write conn s))
              self)
+    :read (fn cors-read [self & args] (:read conn ;args))
     :flush (fn cors-flush [self] (:flush conn) self)
     :close (fn cors-close [self] (:close conn) self)})
 
