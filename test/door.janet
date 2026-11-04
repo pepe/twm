@@ -292,6 +292,8 @@
 (assert (string/find ".b { y: 2 }" served))
 (assert (deep= {} (door/css-route {:public dir})) "no route without :door/css")
 (os/rm (string dir "/a.css")) (os/rm (string dir "/b.css")) (os/rmdir dir)
+(assert (string/find ".b { y: 2 }" (door/css {:door/css ["a.css" "b.css"] :public dir}))
+        "the sheets are read once, so a sandbox closed after the first reading leaves them")
 (assert (= "https://x/_door.css" (get-in (door/<stylesheet/> "https://x/") [1 :href])))
 (assert (not (schema/config/membrane/http-node? {:http "localhost:1" :door/css ["a.css"]}))
         "a door-scoped sheet needs the folder it is read from")

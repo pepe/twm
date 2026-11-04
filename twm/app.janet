@@ -506,23 +506,41 @@ dynamics as set by *rpc-defines*.```
   [css]
   (string "@scope (#door) {\n" (first (peg/match door/css-grammar css)) "\n}\n"))
 
+(def- door/sheets
+  "The door's stylesheets read so far, by public folder and sheets."
+  @{})
+
+(defn door/css
+  ```
+  The stylesheets `space` names as `:door/css`, read from its `:public`
+  folder and scoped to the door, or nil when it names none.
+
+  They are read once: they change only with a release, and a release
+  raises the server again. A place running sandboxed without `:fs` reads
+  them before the sandbox closes, by asking for them first.
+  ```
+  [space]
+  (when-let [sheets (space :door/css)
+             public (space :public)]
+    (def at (string/join [public ;sheets] "\n"))
+    (unless (door/sheets at)
+      (put door/sheets at
+           (string/join (seq [s :in sheets]
+                          (door/scope-css (slurp (string public "/" s))))
+                        "\n")))
+    (door/sheets at)))
+
 (defn door/css-route
   ```
   The route serving a place's stylesheets as an Avatar's door wants them,
   `/_door.css`, when its membrane names them as `:door/css`; none
-  otherwise. They are read from the place's public folder and scoped once,
-  as the server stands up: they change only with a release, and a release
-  raises the server again.
+  otherwise. See `door/css`.
   ```
   [space]
-  (if-let [sheets (space :door/css)
-           public (space :public)]
-    (let [css (string/join (seq [s :in sheets]
-                             (door/scope-css (slurp (string public "/" s))))
-                           "\n")]
-      {"/_door.css" (fn door-css [_]
-                      (http/success css {"Content-Type" "text/css; charset=utf-8"
-                                         "Cache-Control" "no-cache"}))})
+  (if-let [css (door/css space)]
+    {"/_door.css" (fn door-css [_]
+                    (http/success css {"Content-Type" "text/css; charset=utf-8"
+                                       "Cache-Control" "no-cache"}))}
     {}))
 
 (defn ^space/http
