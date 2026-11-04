@@ -141,6 +141,26 @@
   [&opt why]
   (ds/msg/patch-elements (hg/html (door/<closed/> why)) "#door" "outer"))
 
+(defn door/enter
+  ```
+  The URL asking the place at `address` into an Avatar's door. A query
+  `address` carries goes with it: a link may ask the place for something.
+  ```
+  [address]
+  (def at (string/find "?" address))
+  (string (door/base (if at (slice address 0 at) address))
+          "/content?door=enter"
+          (if at (string "&" (slice address (inc at))) "")))
+
+(defn door/entering?
+  ```
+  Whether `req` asks for the place as an Avatar's door shows it, see
+  `door/enter`: the place then answers its stage into `#door`.
+  ```
+  [req]
+  (truthy? (and (dyn :door/address)
+                (string/find "door=enter" (or (req :query-string) "")))))
+
 (defn door/link
   ```
   The attributes of a link from one place to another, `address`.
@@ -157,8 +177,7 @@
     (if (dyn :door/address)
       {:href "#"
        :data-on:click__prevent
-       (string door/leave "@get('" (door/base address) "/content?door=enter', "
-               door/bearer ")")}
+       (string door/leave "@get('" (door/enter address) "', " door/bearer ")")}
       {:href address})))
 
 (defn door/go
@@ -169,8 +188,7 @@
   ```
   [address]
   (if (dyn :door/address)
-    (string door/leave "@get('" (door/base address) "/content?door=enter', "
-            door/bearer ")")
+    (string door/leave "@get('" (door/enter address) "', " door/bearer ")")
     (string "window.location = " (string/format "%j" address))))
 
 (defn door/absolute

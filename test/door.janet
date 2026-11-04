@@ -257,7 +257,12 @@
 (assert (string/find "window.doorLeave" (in-door :data-on:click__prevent)) "it ends the door's requests first")
 (assert (string/find "@get('https://x/todo/content?door=enter', {headers: {Authorization: 'Bearer ' + $_bearer}})"
                      (door/go "https://x/todo")))
+(assert (= "https://x/bill/content?door=enter&project=mtb" (door/enter "https://x/bill/?project=mtb"))
+        "a link's query goes into the door with it")
+(assert (door/entering? {:query-string "door=enter&datastar=%7B%7D"}))
+(assert (not (door/entering? {:query-string "datastar=%7B%7D"})))
 (setdyn :door/address nil)
+(assert (not (door/entering? {:query-string "door=enter"})) "only an Avatar's request enters")
 (assert (= `<img src="https://x/img/a.png"><a href="https://x/attending">`
            (door/absolute `<img src="/img/a.png"><a href="/attending">` "https://x/"))
         "root-relative addresses name the place")
