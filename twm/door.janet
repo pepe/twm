@@ -173,6 +173,25 @@
             door/bearer ")")
     (string "window.location = " (string/format "%j" address))))
 
+(defn door/absolute
+  ```
+  `html` rendered for an Avatar's door, its root-relative `src` and
+  `href` attributes made to name the place at `address`.
+
+  A place's own page may say `/img/a.png`: the browser asks the place.
+  The same markup in an Avatar's page asks the Avatar, which has no such
+  thing. Markup written by hand can say the address itself; markup made
+  from something else -- a deck's slides -- is rewritten here. A link
+  already naming a host, or a fragment, is left as it is.
+  ```
+  [html address]
+  (def base (door/base address))
+  (->> (string html)
+       (string/replace-all "src=\"/" (string "src=\"" base "/"))
+       (string/replace-all "href=\"/" (string "href=\"" base "/"))
+       (string/replace-all (string "src=\"" base "//") "src=\"//")
+       (string/replace-all (string "href=\"" base "//") "href=\"//")))
+
 (defn door/<stylesheet/>
   ```
   The link to the stylesheet the place at `address` serves for an

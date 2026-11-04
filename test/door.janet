@@ -255,6 +255,12 @@
 (assert (string/find "@get('https://x/todo/content?door=enter', {headers: {Authorization: 'Bearer ' + $_bearer}})"
                      (door/go "https://x/todo")))
 (setdyn :door/address nil)
+(assert (= `<img src="https://x/img/a.png"><a href="https://x/attending">`
+           (door/absolute `<img src="/img/a.png"><a href="/attending">` "https://x/"))
+        "root-relative addresses name the place")
+(assert (= `<img src="//cdn/a.png"><a href="https://y/"><a href="#n">`
+           (door/absolute `<img src="//cdn/a.png"><a href="https://y/"><a href="#n">` "https://x"))
+        "and nothing else is touched")
 (end-suite)
 
 (start-suite :door-css)
