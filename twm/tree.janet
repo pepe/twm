@@ -84,6 +84,8 @@
   - a token, with `{:holder h}` or nothing: one more live session at the
     owner's door, held by `h`; a sign-in never ends anyone else's;
   - the empty string with `{:token t}`: that one session ends;
+  - the empty string with `{:token t :holder h}`: that one session ends
+    if `h` holds it, so a holder can end its own and nobody else's;
   - the empty string with `{:holder h}`: every session `h` holds ends;
   - the empty string alone: every session of the door ends, which is what
     it always meant.
@@ -94,7 +96,8 @@
   (def {:holder holder :token token} (or how {}))
   (cond
     (present-string? session) (put live session (or holder true))
-    token (put live token nil)
+    token (when (or (nil? holder) (= holder (get live token)))
+            (put live token nil))
     holder (eachp [t h] (table/clone live) (when (= h holder) (put live t nil)))
     (table/clear live))
   sessions)

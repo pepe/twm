@@ -97,7 +97,8 @@
    :identities (?optional config/identities?)
    :door/issuers (?optional (>?? all present-string?))
    :door/admits (?optional (>?? all config/admit?))
-   :door/yarlyk-max (?optional number?)})
+   :door/yarlyk-max (?optional number?)
+   :door/place (?optional keyword?)})
 
 (def?! config/command
   config/avatar?)

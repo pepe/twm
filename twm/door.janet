@@ -45,17 +45,32 @@
 
 (defn door/place
   ```
-  The one place a guardian with a door admits into, raising unless there
-  is exactly one. A door opens a single place, as an entrance does.
+  The place a guardian with a door admits into.
+
+  A guardian of one place opens that one. A guardian of several has to
+  say which with `:door/place`, the symbiont an Avatar lands on; picking
+  one would be guessing. Its places must all open with the sessions of
+  one owner, or the session a door grants would open the landing place
+  and leave the others shut, so a guardian whose places differ raises
+  here, as one keeping identities does.
   ```
   [state]
-  (def held (values (get state :spaces {})))
-  (assert (= 1 (length held))
-          (string "Guardian " (state :name) " with a door must guard exactly one place, found "
-                  (length held) "."))
+  (def spaces (get state :spaces {}))
+  (def named (state :door/place))
   (assert (nil? (state :identities))
           (string "Guardian " (state :name) " cannot keep both identities and a door."))
-  (first held))
+  (assert (or named (= 1 (length spaces)))
+          (string "Guardian " (state :name) " with a door guards " (length spaces)
+                  " places; name the one an Avatar lands on as :door/place."))
+  (def place (if named (get spaces named) (first (values spaces))))
+  (assert place
+          (string "Guardian " (state :name) " has no place " named " to land on."))
+  (def owner (place/owner state place))
+  (each other (values spaces)
+    (assert (= owner (place/owner state other))
+            (string "Guardian " (state :name) " guards places of different owners; "
+                    "one door cannot open them all.")))
+  place)
 
 (defn door/held?
   "Whether the guardian is answering on `place`'s HTTP address itself."
@@ -103,8 +118,10 @@
   and `:ping`.
 
   `:entry/end avatar` ends every session the avatar holds at this place,
-  and nobody else's. The log names the avatar and the outcome, never a
-  warrant, a signature or a session.
+  and nobody else's; `:entry/end avatar token` ends that one session, if
+  the avatar holds it -- an Avatar leaving one door in one tab leaves its
+  other tabs where they are. The log names the avatar and the outcome,
+  never a warrant, a signature or a session.
   ```
   [state ops]
   (def place (door/place state))
@@ -122,13 +139,18 @@
                     (if (dictionary? answer) "admitted" (answer 1))))
       answer)
     :entry/end
-    (fn entry/end [_ avatar]
-      (if (find |(= avatar ($ :avatar)) (state :door/admits))
+    (fn entry/end [_ avatar &opt token]
+      (cond
+        (not (find |(= avatar ($ :avatar)) (state :door/admits)))
+        [:refused :unknown-avatar]
+        (and token (not (present-string? token)))
+        [:refused :malformed]
         (do
-          ((ops :publish) "" (place/owner state place) {:holder avatar})
-          (produce (log (state :name) " door ended sessions of " avatar))
-          :ok)
-        [:refused :unknown-avatar]))
+          ((ops :publish) "" (place/owner state place)
+                          (if token {:holder avatar :token token} {:holder avatar}))
+          (produce (log (state :name) " door ended "
+                        (if token "a session" "the sessions") " of " avatar))
+          :ok)))
     :ping (fn ping [&] :pong)})
 
 (defn ^door/open
