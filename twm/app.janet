@@ -479,6 +479,52 @@ dynamics as set by *rpc-defines*.```
             res)
           res)))))
 
+(def- door/css-grammar
+  ```
+  What `door/scope-css` rewrites: `:root`, and `html` or `body` standing
+  as a selector, become `:scope`. A word is a selector here when what
+  follows can only follow one -- a class, a pseudo-class, a combinator, a
+  list, a block -- so a declaration that happens to say `body;` stays as
+  it is. Comments are passed over whole.
+  ```
+  (peg/compile
+    ~{:comment (* "/*" (thru "*/"))
+      :before (+ (> -1 (set " \t\r\n,{}>+~(")) (! (> -1 1)))
+      :after (> 0 (set " \t\r\n.:#[,>+~){"))
+      :root (/ ":root" ":scope")
+      :element (* :before (/ (+ "html" "body") ":scope") :after)
+      :main (% (any (+ (<- :comment) :root :element (<- 1))))}))
+
+(defn door/scope-css
+  ```
+  A place's stylesheet `css`, made to style only what lands in an Avatar's
+  door: wrapped in `@scope (#door)`, with the document's own roots --
+  `:root`, `html`, `body` -- read as the door itself. Shown through a door,
+  a place's page is a part of the Avatar's, and a rule for the whole
+  document would restyle the Avatar around it.
+  ```
+  [css]
+  (string "@scope (#door) {\n" (first (peg/match door/css-grammar css)) "\n}\n"))
+
+(defn door/css-route
+  ```
+  The route serving a place's stylesheets as an Avatar's door wants them,
+  `/_door.css`, when its membrane names them as `:door/css`; none
+  otherwise. They are read from the place's public folder and scoped once,
+  as the server stands up: they change only with a release, and a release
+  raises the server again.
+  ```
+  [space]
+  (if-let [sheets (space :door/css)
+           public (space :public)]
+    (let [css (string/join (seq [s :in sheets]
+                             (door/scope-css (slurp (string public "/" s))))
+                           "\n")]
+      {"/_door.css" (fn door-css [_]
+                      (http/success css {"Content-Type" "text/css; charset=utf-8"
+                                         "Cache-Control" "no-cache"}))})
+    {}))
+
 (defn ^space/http
   ```
   Producer running the HTTP server of one living `space`.
@@ -503,7 +549,8 @@ dynamics as set by *rpc-defines*.```
                                  (http/success
                                    (json/encode (readiness/status (space :view)))
                                    {"Content-Type" "application/json"
-                                    "Cache-Control" "no-store"}))}))
+                                    "Cache-Control" "no-store"}))}
+                     (door/css-route space)))
   (def parser
     (http/parser
       (cond-> routes

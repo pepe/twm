@@ -511,14 +511,23 @@
   ```
   Checks if user cookie is in the session. If it is found  `next-middleware`
   is called. If the session is not found it exits.
+
+  A request from an Avatar's page (`cors/wrap` says so by `:door/address`)
+  is not answered with `not-auth`: that is a page of this place, and the
+  page asking is the Avatar's. Its door is closed instead, and the Avatar
+  stays where it is.
   ```
   [not-auth]
   (fn [next-middleware]
     (http/cookies
       (fn check-session [req]
         (define :view)
-        (if-let [ck ((view :cap/session) req)]
-          (next-middleware req)
+        (cond
+          ((view :cap/session) req) (next-middleware req)
+          (dyn :door/address)
+          (http/stream
+            (ds/hg/patch (door/<closed/> "Your session here has ended; enter again from your doors.")
+                         "#door" "outer"))
           (http/not-authorized not-auth
                                (http/content-type ".html")))))))
 
@@ -633,6 +642,27 @@
   (protect (:flush (dyn :sse-conn)))
   (handover/after-response view guards))
 
+(defn- door/content
+  ```
+  Answers `/content` asked from an Avatar's page while the guardian holds
+  the place.
+
+  The guardian's own answers belong to the place's own page: a form, a
+  resume, a transition that ends in navigating. None of them may reach an
+  Avatar's page. With the session a door granted, the place is handed to
+  its symbiont and the door is told to wait for it and ask again -- an
+  asleep tool wakes into the door. Without one, the door closes. Either
+  way the Avatar's page stays where it is.
+  ```
+  [view guards req]
+  (if ((view :cap/session) req)
+    (http/stream-with <handover/>
+                      (handover/transition view guards
+                                           (door/msg/entering (view :address))))
+    (http/stream
+      (ds/hg/patch (door/<closed/> "Your session here has ended; enter again from your doors.")
+                   "#door" "outer"))))
+
 (defn place/secondary?
   ```
   Whether `place` is a door other than the Thicket's entrance.
@@ -743,14 +773,16 @@
   (def {:title title :form form :resume resume} (view :templates))
   (def transition (view :transition/entering))
   (def {:guards guards} view)
-  (if-let [ck ((view :cap/session) req)]
-    (if resume
-      (http/stream (content/into-stage (resume guards)))
-      (http/stream-with <handover/> (handover/transition view guards transition)))
-    (http/stream
-      (content/into-stage
-        @[(if (function? title) (title (human guards)) title)
-          (or form (<form/>))]))))
+  (if (dyn :door/address)
+    (door/content view guards req)
+    (if-let [ck ((view :cap/session) req)]
+      (if resume
+        (http/stream (content/into-stage (resume guards)))
+        (http/stream-with <handover/> (handover/transition view guards transition)))
+      (http/stream
+        (content/into-stage
+          @[(if (function? title) (title (human guards)) title)
+            (or form (<form/>))])))))
 
 (defh /continue
   "Wakes the guarded symbiont after a valid dormant sentry session."
@@ -831,7 +863,9 @@
   (def {:unauthorized unauthorized} (view :templates))
   (def transition (view :transition/entering))
   (def {:guards guards :entrance/address entrance} view)
-  (if ((view :cap/session) req)
+  (cond
+    (dyn :door/address) (door/content view guards req)
+    ((view :cap/session) req)
     (http/stream-with <handover/> (handover/transition view guards transition))
     (http/stream (content/into-stage (unauthorized guards entrance)))))
 
@@ -872,7 +906,12 @@
   ```
   [address handler]
   (fn navigations-only [req]
-    (if (string/find "datastar=" (or (req :query-string) ""))
+    (cond
+      # A stray stream from an Avatar's page must not navigate it: that
+      # page is the Avatar's. Its door is closed instead.
+      (dyn :door/address)
+      (http/stream (ds/hg/patch (door/<closed/>) "#door" "outer"))
+      (string/find "datastar=" (or (req :query-string) ""))
       (http/stream
         (ds/hg/patch (<script/redirect/> address) "body" "append"))
       (handler req))))

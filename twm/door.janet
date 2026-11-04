@@ -72,6 +72,116 @@
                     "one door cannot open them all.")))
   place)
 
+(defn door/base
+  "`address` without its trailing slash, for paths to follow it."
+  [address]
+  (if (string/has-suffix? "/" address) (slice address 0 -2) address))
+
+(def door/bearer
+  ```
+  The options of an action an Avatar's page makes of a place: the session
+  the door gave, as a bearer, read from the Avatar's local `$_bearer`.
+  ```
+  "{headers: {Authorization: 'Bearer ' + $_bearer}}")
+
+(def door/leave
+  ```
+  What a page does before another place takes its door: it ends every
+  request the door made. An Avatar that keeps the door's requests under a
+  controller of its own says so as `window.doorLeave`; without one, the
+  streams that kept their controller on the element that asked, as
+  `el.stream`, are ended, as they always were.
+  ```
+  (string "(window.doorLeave ? window.doorLeave() : "
+          "document.querySelectorAll('#door *').forEach((e) => e.stream?.abort())); "))
+
+(defn door/<entering/>
+  ```
+  The element that opens the place at `address` in an Avatar's door.
+
+  It waits until the place says a symbiont is standing in it -- one may
+  be rising this very moment, handed the place by the door or by its
+  guardian -- and then asks it for `/content?door=enter` with the bearer.
+  The place answers that with its own stage, into `#door`. A place that
+  never comes leaves a sentence saying so, rather than a page waiting on
+  nothing.
+  ```
+  [address]
+  (def base (door/base address))
+  [:div {:id "door"
+         :data-init
+         (string
+           "(async () => { for (let i = 0; i < 300; i++) { "
+           "try { const r = await fetch('" base "/_ready', {cache: 'no-store'}); "
+           "const s = r.ok && await r.json(); "
+           "if (s && s.ready && s.role === 'symbiont') return true; } catch (e) {} "
+           "await new Promise((ok) => setTimeout(ok, 100)); } return false; })()"
+           ".then((up) => up ? @get('" base "/content?door=enter', " door/bearer ") : "
+           "(el.innerHTML = '<p>The door cannot be reached right now.</p>'))")}
+   [:p "Opening" (hg/raw "&hellip;")]])
+
+(defn door/<closed/>
+  ```
+  What an Avatar's door shows once the place behind it has gone, or has
+  stopped letting its session in: the door is closed and the Avatar's
+  page stays. `why` says more, when there is more to say.
+  ```
+  [&opt why]
+  [:div {:id "door"}
+   [:h3 "The door closed"]
+   [:p (or why "This place has gone; enter again from your doors.")]])
+
+(defn door/msg/entering
+  "The SSE message putting `door/<entering/>` for `address` in the door."
+  [address]
+  (ds/msg/patch-elements (hg/html (door/<entering/> address)) "#door" "outer"))
+
+(defn door/msg/closed
+  "The SSE message closing the door, see `door/<closed/>`."
+  [&opt why]
+  (ds/msg/patch-elements (hg/html (door/<closed/> why)) "#door" "outer"))
+
+(defn door/link
+  ```
+  The attributes of a link from one place to another, `address`.
+
+  On the place's own page it is the link it always was. In an Avatar's
+  door it must not navigate -- the page is the Avatar's -- so it ends the
+  door's requests and asks the other place to come into the door, with
+  the bearer. A place its guardian holds wakes for it, see the guardian's
+  `/content`.
+  ```
+  [address &opt attrs]
+  (merge
+    (or attrs {})
+    (if (dyn :door/address)
+      {:href "#"
+       :data-on:click__prevent
+       (string door/leave "@get('" (door/base address) "/content?door=enter', "
+               door/bearer ")")}
+      {:href address})))
+
+(defn door/go
+  ```
+  A script expression taking the page to `address`: `window.location` on
+  the place's own page, and the other place entered into the door in an
+  Avatar's, see `door/link`.
+  ```
+  [address]
+  (if (dyn :door/address)
+    (string door/leave "@get('" (door/base address) "/content?door=enter', "
+            door/bearer ")")
+    (string "window.location = " (string/format "%j" address))))
+
+(defn door/<stylesheet/>
+  ```
+  The link to the stylesheet the place at `address` serves for an
+  Avatar's door, `/_door.css`; see `door/css-route`. It goes inside the
+  door, so it leaves with the door.
+  ```
+  [address]
+  [:link {:rel "stylesheet" :href (string (door/base address) "/_door.css")}])
+
 (defn door/held?
   "Whether the guardian is answering on `place`'s HTTP address itself."
   [place]
