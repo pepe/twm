@@ -1294,8 +1294,10 @@ dynamics as set by *rpc-defines*.```
     (filter present?
             [options
              (if address "headers: {Authorization: 'Bearer ' + $_bearer}")]))
+  # A URL a place built from its own address already names the place.
+  (def named? (string/find "://" (string (first parts))))
   (string "@" method "('"
-          ;(if address
+          ;(if (and address (not named?))
              [(if (string/has-suffix? "/" address) (slice address 0 -2) address)]
              [])
           ;parts "'"

@@ -211,6 +211,9 @@
 (assert (= "@get('https://dan.admin.example/content', {requestCancellation: el.stream, headers: {Authorization: 'Bearer ' + $_bearer}})"
            (ds/action-with "get" "requestCancellation: el.stream" "/content"))
         "and the bearer joins them for an Avatar")
+(assert (= "@post('https://dan.admin.example/todo/swap', {headers: {Authorization: 'Bearer ' + $_bearer}})"
+           (ds/post "https://dan.admin.example/todo/swap"))
+        "an action already naming its place only gains the bearer")
 (setdyn :door/address nil)
 (import ../twm/schema :as schema)
 (assert (not (schema/config/membrane/http-node? {:http "localhost:1" :origins [origin]}))
