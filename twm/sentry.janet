@@ -459,9 +459,11 @@
 
   A door may have several sessions at once -- two people, or one person in
   two places -- and a sign-in adds one rather than replacing the others.
-  `tokens` is keyed by the tokens; what each is mapped to, its holder,
-  does not matter here. The empty string is never a token, so no request
-  that offers nothing is admitted.
+  `tokens` is keyed by the tokens, each mapped to its holder or `true`,
+  and an admitted request is answered with that -- "locker/pepe" for a
+  session an Avatar gave -- so a place can say whose it is; a refused one
+  with `false`. The empty string is never a token, so no request that
+  offers nothing is admitted.
 
   A token may arrive as the `session` cookie, one value or several, as
   `=>session/?eq` explains, or as `Authorization: Bearer <token>` from an
@@ -475,10 +477,10 @@
   [tokens]
   (def live @{})
   (def bearers @{})
-  (eachk token tokens
+  (eachp [token holder] tokens
     (when (present-string? token)
-      (put live token true)
-      (put bearers (bearer token) true)))
+      (put live token (or holder true))
+      (put bearers (bearer token) (or holder true))))
   (fn live? [req]
     (def headers (get req :headers))
     (var found (get bearers (get headers "Authorization")))
@@ -488,8 +490,17 @@
       (unless found
         (when offered
           (each value offered
-            (when (get live value) (set found true))))))
-    (if found true false)))
+            (unless found (set found (get live value)))))))
+    (if found found false)))
+
+(defn session/holder
+  ```
+  Who holds the session the request being answered came with, as its
+  check named them -- "locker/pepe" -- or nil where it named nobody.
+  ```
+  []
+  (def holder (dyn :session/holder))
+  (if (string? holder) holder))
 
 (defn check-session
   ```
@@ -503,7 +514,9 @@
       (produce (diag "session-check name=" (view :name)
                      " cookie-present=" (truthy? (get-in req [:headers "Cookie" "session"]))
                      " cap-present=" (truthy? (view :cap/session))))
-      (if-let [ck ((view :cap/session) req)]
+      (def ck ((view :cap/session) req))
+      (setdyn :session/holder ck)
+      (if ck
         (next-middleware req)
         (http/not-authorized)))))
 
@@ -516,14 +529,20 @@
   is not answered with `not-auth`: that is a page of this place, and the
   page asking is the Avatar's. Its door is closed instead, and the Avatar
   stays where it is.
+
+  Who holds an admitted session is kept for the request, as
+  `session/holder` reads it, and set afresh on every one: a connection
+  answers request after request in one fiber.
   ```
   [not-auth]
   (fn [next-middleware]
     (http/cookies
       (fn check-session [req]
         (define :view)
+        (def holder ((view :cap/session) req))
+        (setdyn :session/holder holder)
         (cond
-          ((view :cap/session) req) (next-middleware req)
+          holder (next-middleware req)
           (dyn :door/address)
           (http/stream
             (ds/hg/patch (door/<closed/> "Your session here has ended; enter again from your doors.")

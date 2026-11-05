@@ -143,7 +143,8 @@
    :key (?optional present-string?)
    :door (?optional present-string?)
    :address (?optional present-string?)
-   :title (?optional present-string?)})
+   :title (?optional present-string?)
+   :short (?optional present-string?)})
 
 (def?! config/membrane/http-node
   dictionary?
