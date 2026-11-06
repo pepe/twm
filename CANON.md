@@ -1,6 +1,6 @@
 # Thicket Web Mind
 ## Working Canon — Telos, Ontology, Epistemy
-### Structural Alignment · 16 August 2026
+### Structural Alignment · 6 November 2026 — Warrant Kinds and Locker Role
 
 ## Opening Chant
 
@@ -321,9 +321,23 @@ A Thicket is not a catalogue of components. It is a bounded arrangement of diffe
 
 A Thicket is a bounded living software organism whose identity lies in lawful continuity of Truth and Benefit through changing runtime bodies.
 
-It is not defined by uninterrupted process execution or unchanged implementation.
+This definition remains primary.
 
-One Thicket holds one sovereign beneficiary context. Distinct beneficiary contexts that require isolated truth or authority belong in distinct Thickets, related only through declared Membranes.
+A Thicket should also be understood as a local jurisdiction across the three principal movements of the Canon.
+
+In Telos, it is a field in which declared Benefit can be pursued coherently and remains answerable to Beneficiary, Benefit, and what must not be sacrificed.
+
+In Ontology, it is a local living world with its own Mycelium, Truth authority, lifecycle, Demiurge, boundaries, inhabitants, Postures, and becoming.
+
+In Epistemy, it is a jurisdiction within which canonical Truth, epistemic burden, and consequence-relative sufficiency are evaluated locally rather than inherited silently from elsewhere.
+
+A useful boundary test is:
+
+> A Thicket is the smallest local world within which Telos, canonical Truth, lifecycle, and warranted consequence can remain coherent without pretending that an external authority is internal.
+
+This is explanatory guidance, not a replacement for the primary definition.
+
+It is not defined by uninterrupted process execution or unchanged implementation.
 
 It is inhabited by Symbionts, joined through Mycelium, bounded by Membranes, and encountered as Flower.
 
@@ -339,7 +353,9 @@ A Tree is a canonical-authority symbiont.
 
 An Avatar is a human-facing symbiont.
 
-A Cosymbiont is a scope-bound, Avatar-like symbiont using only a selected part of the domain information.
+A Cosymbiont is an Avatar-like Symbiont operating from a deliberately restricted domain and operative context.
+
+Its scope is shaped through SmallWorld, Capability, Posture, boundary, Truth need, and epistemic need rather than tenancy as a universal architectural primitive.
 
 A Steward is an operational-power symbiont.
 
@@ -377,7 +393,13 @@ An Avatar does not decide canonical domain truth.
 
 Avatars act. Trees decide canonically.
 
-A Cosymbiont is an Avatar-like symbiont bound to a restricted participant context. It uses only a selected part of domain information and participates from within a limited scope.
+A Cosymbiont is an Avatar-like Symbiont operating from a deliberately restricted domain and operative context. It uses only the lawful slice of domain information required by its participation.
+
+That scope may arise from person, organization, role, task, project, temporary collaboration, legal or institutional boundary, trust relation, delegated Capability, restricted epistemic jurisdiction, or other application-specific context.
+
+This list is illustrative, not a taxonomy.
+
+Tenant may remain legitimate domain Truth where a particular application genuinely contains tenants, customers, institutions, households, or similar entities. It is not a TWM ontological primitive and does not define Cosymbiont as such.
 
 A Cosymbiont is not a smaller Tree. It does not own canonical domain truth unless separately declared as a Tree. It is a scoped participant in perception, action, and intent.
 
@@ -415,6 +437,22 @@ A human interface that hides these distinctions may feel smooth, but it weakens 
 
 ## SmallWorlds, Capabilities, and Postures
 
+Identity-bearing facts, Posture, and observation are distinct.
+
+Identity-bearing facts determine what a being is.
+
+Posture describes how the being presently stands: its current arrangement, activity, connectivity, Temperature, active Capabilities, location, and other mutable state.
+
+Observation describes what is presently perceived or known about the being.
+
+What a being is, how it presently stands, and what is presently known about it must not collapse into one another.
+
+A transient fact must not accidentally become identity-bearing merely because it is vivid, recent, measurable, or currently observed.
+
+A change of Posture does not by itself make a new being.
+
+A changed observation does not by itself change either identity or Posture.
+
 Unless stated otherwise, the whole world of a running organism is the Thicket.
 
 The Information Field of the Thicket is its WholeWorld™.
@@ -423,7 +461,17 @@ A Symbiont does not receive the WholeWorld.
 
 A born Symbiont receives a SmallWorld™: the local state-world it may inhabit, perceive, remember, act within, and lawfully change.
 
-A Symbiont’s state is its SmallWorld.
+A Symbiont’s SmallWorld is the local state-world lawfully available to its life.
+
+A SmallWorld scopes participation inside one Thicket.
+
+A smaller view is not automatically a smaller Thicket.
+
+A participant, Avatar, Cosymbiont, or other Symbiont may receive a lawful SmallWorld shaped by role, Capability, Posture, boundary, Truth need, and epistemic need without thereby becoming a tenant or a separate sovereign world.
+
+Whether that scope corresponds to a domain concept called a tenant, household, organization, project, person, or institution is application Truth rather than TWM ontology.
+
+It may contain identity-bearing facts, current Posture, and observations, but these remain distinct within it.
 
 Everything outside that SmallWorld is beyond its membrane.
 
@@ -438,6 +486,13 @@ A Capability is specified lawful power in context.
 It is not a role, a permission label, or a symbolic badge.
 
 It is what a Symbiont can actually do, receive, call, emit, perceive, or use in its current context.
+
+A Capability may carry provenance about how or through whom it came to be held.
+
+Such holder provenance helps explain the lawful chain by which the Capability reached the current participant.
+
+It does not enlarge the Capability, prove identity by itself, or substitute for the authority that made the grant lawful.
+
 
 A Posture is the runtime shape of a Symbiont.
 
@@ -472,6 +527,94 @@ A Symbiont should maintain lawful life until the Demiurge collapses it or Avatar
 Capabilities nourish.
 
 Posture blooms.
+
+Compute is nourishment, not a place.
+
+A Symbiont need not own its metabolism.
+
+When richer metabolism becomes lawfully available, Posture may expand.
+
+When that metabolism disappears, the organism may become smaller again without losing continuity, identity, or lawful relation.
+
+
+
+## Symbiont Habitation
+
+Habitation is a normal lifecycle function of a Thicket.
+
+A Symbiont may be cultivated independently and later enter a more involved Thicket.
+
+Movement of implementation does not by itself establish operational membership.
+
+Operational membership does not by itself establish informational integration.
+
+Informational integration does not by itself grant Capability.
+
+These distinctions must remain visible.
+
+A useful habitation arc may include:
+
+- independent cultivation, where behavior develops without requiring knowledge of its eventual environment;
+- arrival, where the receiving Thicket admits a prepared body under controlled conditions and a deliberately small SmallWorld;
+- stabilization, where operational behavior is observed in the new environment;
+- orientation, where lawful internal intelligence discovers how the newcomer’s declared needs may relate to the receiving Information Field;
+- integration, where accepted relationships, Tree adaptations, Shadows, Intents, and Capabilities are established under local authority;
+- continued habitation, where those relationships and Capabilities may evolve throughout life.
+
+These are conceptual distinctions, not mandatory sequential states and not a second lifecycle framework.
+
+A Symbiont brings behavior.
+
+The receiving Thicket governs its habitation, establishes its relationships, and retains sovereignty over its Information Field.
+
+Habitation therefore does not mean that a newcomer arrives with a right to know.
+
+A third-party developer may supply behavior, artifacts, declared requirements, tests, and evidence.
+
+The receiving Thicket decides what those requirements mean locally, what may be disclosed, which relationships are legitimate, which Capabilities may exist, and whether participation should continue.
+
+Stabilization is not trustworthiness.
+
+Observed calm behavior does not justify arbitrary disclosure.
+
+Information already disclosed cannot be made unknown merely by revoking a Capability.
+
+Habitation must therefore respect the asymmetry between granting future access and undoing past disclosure.
+
+Implementation, identity, and accumulated state must also remain distinct.
+
+Moving an executable body or source lineage does not by itself prove continuity of Symbiont identity.
+
+Moving accumulated state does not by itself move authority.
+
+Whether a transplanted inhabitant remains the same Symbiont depends on identity-bearing continuity and lawful lifecycle transition, not on code similarity alone.
+
+A Thicket may reorganize the lawful relationships among its inhabitants during ordinary life.
+
+This is not necessarily a new development cycle.
+
+Where existing form is sufficient, relationships, Shadows, Intents, and Capabilities may change while the Symbiont remains alive.
+
+Where habitation reveals missing structure, incompatible invariants, or a need for new authoritative form, the pressure returns to Archetype, Tree evolution, or another proper season of becoming.
+
+Habitation does not license hidden runtime mutation merely because adaptation is desirable.
+
+A newcomer may discover new significance in existing Truth without rewriting historical Truth.
+
+For example, a Billing Symbiont may later interpret selected Track records in relation to projects, customers, and billing terms.
+
+The old Track records need not be rewritten merely because they acquire new billing significance.
+
+Reading work records, deciding billability, and issuing invoices remain different Capabilities and different consequences.
+
+Existing Symbionts need not be modified merely because another inhabitant can lawfully interpret their information.
+
+The Thicket may instead establish new relations around stable Truth.
+
+Habitation is therefore an ordinary metabolic responsibility of a living Thicket: the lawful reorganization of participation around inhabitants whose relationships, needs, and Postures change through time.
+
+---
+The appearance or disappearance of compute may therefore change Posture without redefining the being.
 
 ---
 
@@ -556,6 +699,14 @@ Augur
 
 Temperature may inform Divination, but it must not command Posture.
 
+Compute availability may change which warm or hot work can be metabolized economically.
+
+Expensive processes may remain cold, deferred, or accumulating while richer metabolism is absent, then become practical when nearby compute appears.
+
+This does not make compute availability itself Temperature.
+
+It changes the Posture in which Temperature can be answered.
+
 An Augur may observe Temperature, trajectory, decay, oscillation, resources, history, Telos, and other Shadows to divine whether a change of Posture is warranted.
 
 Observe what becomes active.
@@ -584,7 +735,11 @@ A Thicket is a sovereign computational organism bound to one host operating syst
 
 A Thicket is not a cluster.
 
-All symbionts belonging to a Thicket execute on the same host.
+One Thicket is bound to one host, but one host may contain several distinct Thickets.
+
+Sharing a machine does not merge worlds, Truth authorities, Mycelia, Membranes, or lifecycle sovereignty.
+
+All native Symbionts belonging to a Thicket execute on the same host.
 
 The Mycelium is strictly local.
 
@@ -598,17 +753,44 @@ Strict locality removes internal network partition, split brain, distributed con
 
 A Thicket is local so its truth can remain coherent.
 
+Some primitive invariants may belong to the Living Place itself.
+
+A crossing, Capability use, or other consequence may therefore be structurally impossible beneath the interpreting Symbionts, even when an administering Symbiont is absent, unhealthy, or mistaken.
+
+Such a mechanical invariant is not an epistemic judgment.
+
+It constrains which consequences are possible at all; it does not decide whether available grounds are sufficient for a contemplated consequence.
+
 Large systems scale by relations among local organisms, not by pretending that distributed uncertainty is local truth.
 
 ---
 
+### Living Place
+
+Living Place names the stable local operational place through which a guarded Symbiont may remain situated across changing runtime Postures.
+
+A process may sleep, stop, or be replaced while its lawful place remains available for later return.
+
+Living Place is therefore not the Symbiont's identity, not the current process, and not the whole Thicket.
+
+It is part of the local habitat in which boundary, addressability, primitive invariants, and lifecycle continuity may be held while a particular body is absent or changing.
+
+Letting go of a current body is not necessarily dying.
+
+A sleeping inhabitant may later wake into the same lawful place.
+
+
 ## Mycelium Participation and Mycelium-Only Symbionts
 
-All Symbionts belong to the Mycelium, always.
+All native Symbionts of a Thicket belong to that Thicket's Mycelium.
 
-The distinction is not between Mycelium Symbionts and Membrane Symbionts.
+A Symbiont of another Thicket does not join the local Mycelium merely because the two worlds are nested, share a host, or maintain an intimate operational relation.
 
-The distinction is between Symbionts that participate only through the Mycelium and Symbionts whose Membrane also permits lawful relation with the Panopticum.
+Cross-Thicket participation remains a Membrane relation.
+
+The distinction inside one Thicket is not between Mycelium Symbionts and Membrane Symbionts.
+
+It is between native Symbionts that participate only through the Mycelium and native Symbionts whose Membrane also permits lawful relation with the Panopticum.
 
 Mycelium-only Symbionts may include Demiurge, Tree, Augur, Oracle, composters, workers, schedulers, cleaners, indexers, builders, and monitors.
 
@@ -636,9 +818,17 @@ HTTP, RPC, CLI streams, routes, ports, replicated listeners, signed file export,
 
 They are not separate Membranes by themselves.
 
-A Membrane may contain multiple routes or replicated listeners while remaining one coherent boundary, provided they belong to the same lawful capability and trust regime.
+A Membrane may contain multiple routes, listeners, and crossings while remaining one coherent boundary.
 
-A Membrane is not defined by protocol. It is defined by boundary, trust distance, and role.
+Those crossings need not all use the same trust ceremony.
+
+A local entrance and a foreign warrant-bearing door may belong to one Membrane while remaining different trust regimes.
+
+The unity lies in the host boundary and lawful responsibility, not in pretending all crossings are equivalent.
+
+Each concrete crossing should keep one declared relation, one clear owner of its sessions, and one intelligible authority path.
+
+A Membrane is not defined by protocol. It is defined by the boundary it guards and the lawful relations it admits.
 
 No raw authority crosses the Membrane.
 
@@ -653,6 +843,36 @@ Membranes carry bounded contact.
 Mycelium carries living relation.
 
 Aether carries becoming.
+
+Communication may become fast, reliable, or nearly transparent at the transport level without making boundaries disappear.
+
+A Thicket boundary is ontological and lawful, not merely a technical inconvenience.
+
+A lawful gateway makes crossing possible. It must not erase the semantic fact that a crossing occurred.
+
+Seamless communication must not imply boundaryless existence.
+
+Within one Thicket, Mycelium may optimize communication aggressively because native participants already share local belonging.
+
+Membrane preserves the meaning and lawfulness of crossing between places.
+
+The desired property is lawful reachability, not location transparency.
+
+A Thicket boundary also changes epistemic context.
+
+Authority does not cross merely because information crosses.
+
+Truth in one Thicket does not automatically become canonical Truth in another.
+
+When information crosses from one Thicket to another, the receiving Thicket receives only what the declared relation lawfully carries: a representation, claim, evidence, Shadow, warrant, observation, or other ground.
+
+What is Truth there may arrive only as grounds here.
+
+The receiving Thicket preserves its own authority.
+
+A foreign Yarlyk may be portable, but its force remains bounded by claim, provenance, conditions, burden, and contemplated consequence. A receiving Thicket may recognize such a warrant through declared pact, but must not silently convert foreign epistemic authority into local canonical authority.
+
+The Membrane is therefore not merely a technical or security boundary. Where it marks a Thicket boundary, ontology, trust, authority, and epistemic status may change across the crossing.
 
 Same protocol does not imply same ontology.
 
@@ -1265,6 +1485,23 @@ It is inspectable, composable, transformable, generatable, diffable, and reviewa
 
 The archetype must be declarative, but writable by life.
 
+The same distinction holds at ecology scale.
+
+An authored declaration may state which child worlds, relations, resources, or Postures should exist.
+
+Tree may then preserve observations of what actually exists.
+
+Declared form and observed life must not collapse into one another.
+
+Some accepted changes can be absorbed by a living world as Posture: a peer configuration, relation, Capability, or replaceable key may change while identity and lifecycle authority remain coherent.
+
+Other changes reach the structural roots by which the world itself is born and therefore require renewed becoming or rebirth.
+
+The exact seam is discovered through Praxis rather than fixed by vocabulary alone.
+
+Where possible, failed becoming should leave the last viable form available rather than destroying it before the candidate form proves it can live.
+
+
 Living operation may reveal missing capability, failure, pressure, or unmet intention. These signals may produce proposals to revise the archetype.
 
 But structural truth must pass through archetype.
@@ -1391,13 +1628,54 @@ The Binder is not a symbiont.
 
 The Binder gives breath, not meaning.
 
-Demiurge is the lifecycle-authority symbiont of a thicket.
+Demiurge is the lifecycle-authority Symbiont of one Thicket.
 
-Demiurge fulfills archetype, births symbionts, kills symbionts, supervises becoming, harvests remains, and maintains continuity between residue and operational field.
+A Demiurge tends the conditions under which its Thicket can live.
+
+It is local to that world.
+
+It is not a global supervisor of all Thickets and does not gain arbitrary authority over another Thicket merely because the worlds are related.
+
+Demiurge fulfills Archetype, births Symbionts, collapses or retires Symbionts, supervises becoming, harvests remains, and maintains continuity between residue and operational Field.
+
+Its local responsibilities may include:
+
+- birth and bootstrap;
+- local watchdogging and health observation;
+- preservation or restoration of intended Posture;
+- backup, restore, resurrection, hibernation, and wake;
+- maintenance of local artifacts and libraries required to reconstruct the Thicket;
+- awareness of resources granted to its Thicket;
+- orderly death, retirement, and harvesting of remains.
+
+These responsibilities concern local viability.
 
 Demiurge owns lifecycle truth, not business truth.
 
-The name Demiurge is mythically loaded. In TWM it is used operationally: the one that brings declared form into runtime being. It is not theological authority and not domain authority.
+Demiurge does not raise a declared fleet merely because it can.
+
+Birth of intended peers or child worlds follows accepted structural intent.
+
+By contrast, restoring a crashed inhabitant toward an already accepted Posture may remain within Demiurge's local duty of viability.
+
+Creation and restoration therefore carry different authority burdens even when both result in a running process.
+
+
+In habitation, Demiurge may place or awaken an arriving Symbiont, maintain its bounded operational conditions, observe lifecycle health, and enact approved lifecycle changes.
+
+Demiurge does not decide the semantic meaning of the newcomer’s requirements.
+
+Demiurge does not make stabilization equivalent to trust.
+
+Demiurge does not grant itself authority to reshape domain Truth merely because a newcomer is viable.
+
+A local Demiurge asks how its own Thicket may remain viable within the conditions and resources available to it.
+
+It does not decide how several sibling Thickets should be ranked, funded, promoted, starved, created, or retired.
+
+Such cross-world decisions belong to the parent Thicket in which those child worlds participate.
+
+The name Demiurge is mythically loaded. In TWM it is used operationally: the one that brings declared form into runtime being and tends the viability of that local world. It is not theological authority, domain authority, or global orchestration authority.
 
 In OPM modelling, Demiurge should be represented through explicit lifecycle authority, states, and processes, not as a vague creator-substance.
 
@@ -1420,6 +1698,10 @@ It is an unfinished birth that may be retried under changed conditions.
 Demiurge should therefore treat failed birth carefully: not as meaningless crash, but as partial becoming whose remains, causes, and changed conditions may matter.
 
 A Thicket remains itself not because every process runs without interruption, but because lawful continuity of truth, benefit, authority, and becoming is preserved across interruptions.
+
+Hibernation and resurrection are therefore lifecycle Postures, not exceptions to life.
+
+The local Demiurge tends those transitions for its own Thicket.
 
 ---
 
@@ -1501,7 +1783,7 @@ Explicit events make change traceable.
 
 Small symbionts confine failure.
 
-Demiurge maintains lifecycle continuity.
+Each Demiurge tends lifecycle continuity and viability within its own Thicket.
 
 Deterministic projections do not corrupt canon.
 
@@ -1549,6 +1831,13 @@ The goal is not to identify a guilty component.
 
 The goal is to locate unresolved pressure and restore lawful life.
 
+A compensation should name the fault or pressure it compensates for.
+
+When the fault disappears, the compensation should be reconsidered, reduced, or composted rather than surviving as unexplained armor.
+
+Unnamed compensation easily becomes permanent complexity whose original cause has been forgotten.
+
+
 ---
 
 ## Security as Field Protection
@@ -1562,6 +1851,22 @@ This means: do not defend every individual business narrative separately. Protec
 A hostile actor should not be able to couple to canonical truth, lifecycle truth, topology, validation gradients, session gradients, or domain semantics through the real membrane.
 
 Security in TWM is capability shaping before exposure, not access filtering after exposure.
+
+Topology is not cryptographic independence.
+
+Where a parent provisions relation keys, signing material, trusted issuers, or origins for a child relation, the resulting posture is delegated and shared in precisely those respects.
+
+A declared child boundary may still preserve local Truth and lifecycle sovereignty, but the Canon must not describe cryptographic authority as independent when another party can reproduce it.
+
+Key custody is therefore part of the authority map.
+
+Presentation containment is also not execution isolation.
+
+Foreign or guest presentation may be kept within a host-controlled place, with scoped style, bounded navigation, and a lawful close of the relation rather than seizure of the host surface.
+
+But if foreign markup or scripts execute in the Avatar's page, this remains presentation discipline, not a security sandbox.
+
+No foreign king should silently acquire the host's page merely because a door was opened.
 
 Not all Capabilities are shadow-derived.
 
@@ -1621,27 +1926,292 @@ A rebuildable artifact is not free merely because it can be rebuilt.
 
 A backup strategy that saves disk but burns excessive time, attention, energy, or deployment certainty may be metabolically wrong.
 
+A backup merely existing is weaker than a backup shown to be resurrectable.
+
+Restoring preserved truth and artifacts into a bounded child Thicket and observing that world reach a viable Posture provides stronger grounds that rebirth is actually possible.
+
+This remains an epistemic distinction, not a magical property of the backup.
+
+A successful resurrection may strengthen the warrant for claims such as recoverability, but the required burden still depends on the contemplated consequence.
+
 ---
+
+
+## Hardware Physiology and Compute Fields
+
+TWM should not begin by inventing a bespoke processor for itself.
+
+A healthier path is to preserve a standard computational substrate and allow specialization to emerge only where observation proves it metabolically useful.
+
+Open RISC-V ecosystems such as OpenHW / CORE-V and PULP provide a plausible long-term lineage for this approach: conventional computation may remain general while selected hot paths are later offloaded, extended, or specialized.
+
+This is an affinity and development path, not a dependency.
+
+The important architectural law is that specialization remains behind stable TWM Capabilities.
+
+A Symbiont should not know whether its lawful consequence is fulfilled by scalar execution, vector machinery, tensor hardware, programmable logic, adaptive fabric, or a future custom extension.
+
+Verification matters conceptually here.
+
+Specialized hardware should emerge from demonstrated grounds and measured metabolic benefit rather than speculative optimization.
+
+### Unified Compute Field
+
+Contemporary heterogeneous systems increasingly combine multiple local forms of metabolism: general CPU execution, GPU-like parallelism, tensor or NPU inference, shared memory, signal processing, real-time control, and adaptive or programmable execution resources.
+
+For TWM, this is best understood as a local compute field.
+
+**The machine is becoming a field of specialized metabolisms.**
+
+No one execution form is the organism.
+
+A powerful local machine is therefore a compute organ of a Thicket, not the Thicket itself and not “the AI.”
+
+The long-term target is not merely unified memory or heterogeneous acceleration in isolation.
+
+It is a unified compute field in which multiple forms of metabolism remain available behind stable TWM Capabilities.
+
+### PocketThicket and Borrowed Metabolism
+
+PocketThicket should remain an autonomous small organism.
+
+It carries continuity, identity, local sensing, ordinary interaction, situated state, and enough computation to remain useful by itself.
+
+It need not contain all intelligence or all expensive compute.
+
+When richer nearby metabolism becomes available, the same Thicket may lawfully borrow it for work such as:
+
+- deep composting;
+- large-model inference;
+- training or adaptation;
+- indexing;
+- simulation;
+- reconstruction;
+- expensive perception or transformation.
+
+The PocketThicket does not become a thin client.
+
+The larger machine does not become the center.
+
+Identity does not need to migrate.
+
+Additional Capability simply becomes available to the existing Thicket.
+
+**Intelligence does not have to fit inside the pocket; continuity does.**
+
+A smaller situated local Oracle, supported by Tree, Shadows, Augurs, Baskak/Yarlyk, sensory Symbionts, and other specialized organs may be more useful to one Avatar than a much larger generic Oracle acting alone.
+
+A large remote Oracle may remain an exceptional visiting intellect rather than the organism itself.
+
+The target is not:
+
+> put the whole intelligence into one device.
+
+The target is:
+
+> build a situated intelligent ecology whose available metabolism expands and contracts.
+
+### Evolutionary Specialization
+
+Programmable and adaptive hardware provide a useful evolutionary intermediate between software and custom silicon.
+
+A TWM operation may move through a sequence such as:
+
+1. run in ordinary software;
+2. be observed in long-lived use;
+3. prove itself persistently expensive or important;
+4. move into programmable or adaptive hardware;
+5. be measured again for real metabolic benefit;
+6. only then justify a custom extension or TWM-shaped silicon.
+
+This sequence is canonical in spirit even where the hardware lineage remains provisional.
+
+Hardware should grow from observed need, not speculative architecture.
+
+### Physical Scale
+
+TWM hardware should be understood as a scale of available metabolism rather than as rigid machine classes.
+
+A possible ecology is:
+
+small sensing organs  
+→ PocketThicket  
+→ portable or nearby compute surfaces  
+→ Home Thicket compute organ  
+→ community or institutional compute  
+→ exceptional remote metabolism
+
+The same Thicket semantics should survive across the scale.
+
+Product names and transient specifications are evidence that such scales are already practical, not canonical dependencies.
+
+
+## When a New Symbiont Is Needed and When a New Thicket Is Needed
+
+A new role does not imply a new Thicket.
+
+Prefer a new Symbiont when a differentiated participant can lawfully inhabit the existing Information Field, accept the existing canonical Truth authority, and operate within the existing Telos and epistemic jurisdiction.
+
+A new Thicket becomes appropriate when a new locally sovereign field must exist.
+
+A useful rule of thumb is:
+
+> Create a new Symbiont when a new role is needed. Create a new Thicket when a new sovereign field of Truth, Telos, lifecycle, and consequence is needed.
+
+This is not an absolute mechanical rule.
+
+A meaningful Thicket boundary is better recognized through the conjunction of:
+
+- declared Benefit and Beneficiary;
+- Telos;
+- canonical Truth jurisdiction;
+- epistemic jurisdiction and consequence-relative burdens;
+- lifecycle sovereignty;
+- bounded Information Field;
+- local Mycelium;
+- lawful Membrane relations;
+- ability to preserve continuity without pretending that external authority is internal.
+
+Topology, deployment convenience, user count, organizational ownership, code organization, tenancy, or namespace are insufficient by themselves to establish a Thicket boundary.
+
+A Symbiont inhabits a world.
+
+A Thicket establishes the lawful world in which participation becomes meaningful.
 
 ## Nested Thickets
 
-Large systems should scale by nested thickets, not flattened distributed chaos.
+Large systems should scale by nested Thickets, not flattened distributed chaos.
 
 One Demiurge belongs to one Thicket.
 
-A lower Demiurge may appear as a node in a higher ecology while preserving its own lifecycle and truth boundary.
+A Thicket may cultivate other Thickets through their Demiurges.
+
+When a child Thicket participates in a parent Thicket, the child's Demiurge is the parent's lawful operational handle on that child world.
+
+The Demiurge remains a native Symbiont of the child.
+
+Its relation to the parent crosses the child's Membrane; it does not acquire the parent's Mycelium merely because the parent supervises or addresses it.
+
+This does not collapse the child into the parent.
+
+The parent need not reach arbitrarily into the child's internal Mycelium, Truth, Posture, or lifecycle machinery.
+
+It acts toward the child through the Symbiont that locally tends that child's viability and through whatever lawful crossings and Capabilities have been granted.
+
+Recursive locality follows:
+
+- each Thicket has its own Demiurge;
+- a child Thicket's Demiurge may participate as a Symbiont of the parent Thicket;
+- local viability belongs to the local Demiurge;
+- coordination among several child worlds belongs to the parent Thicket.
+
+The local Demiurge may decide how to preserve its own world within granted resources.
+
+The parent Thicket may decide which child worlds should receive resources, sleep, wake, be born, be promoted, be retired, or cease to exist.
+
+A child Demiurge must not silently convert parent policy into local omnipotence.
+
+A parent Thicket must not use hierarchy as an excuse to erase the child's boundary.
 
 Topology is not trust.
 
 A nested ecosystem is not one stretched Thicket. It is a relation among local Thickets through declared boundaries and explicit trust domains.
 
-Nested thickets scale by composition of local organisms, not by violating locality.
+Nested Thickets scale by composition of local organisms, not by violating locality.
 
-Canonical truth is always canonical within a declared authority boundary.
+Canonical Truth is always canonical within a declared authority boundary.
 
-Cross-thicket truth requires declared relation, not implicit shared state.
+Recursion is relayed, not flattened.
+
+A grandparent does not gain an implicit path into a grandchild.
+
+It may reach only through relations that the intervening Thicket declares and lawfully forwards.
+
+Each level therefore remains capable of shaping, refusing, or withholding the relation it carries.
+
+This is a runtime witness of fractal locality: the same Membrane discipline reappears at each scale.
+
+
+Cross-Thicket Truth requires declared relation, not implicit shared state.
+
+A parent Thicket does not become the Tree of its children.
+
+A child Thicket does not become a namespace, tenant, or isolated partition of its parent.
+
+The child retains its own local Truth, lifecycle, Mycelium, Demiurge, and lawful boundary.
+
+The parent may hold domain Truth about the child as a child: its existence, health, lifecycle, resource allocation, promotion, hibernation, retirement, relationships, and other facts required by the parent's Telos.
+
+This does not grant the parent possession of arbitrary child domain Truth.
+
+The parent's Truth about a child and the child's own Truth remain distinct.
+
+A Thicket of Thickets is not one larger stretched Thicket.
+
+It is a local Thicket whose meaningful participants may include lawful representations of other local worlds, often through their Demiurges and declared Membrane relations.
+
+### Dreaming — Temporary Child Thickets
+
+A parent Thicket may temporarily cultivate a bounded child world in order to live through a possible consequence before admitting that consequence into a waking Thicket.
+
+Dreaming is the working name for this operation.
+
+A dream is a temporary child Thicket.
+
+It has its own Demiurge, its own bounded Posture, its own lifecycle, and its own Truth boundary.
+
+It may inherit selected state, preserved Truth, artifacts, configuration, or libraries from another Thicket without becoming identical to that Thicket.
+
+A dream may be used to:
+
+- restore a backup into a disposable child and prove that it can live;
+- rehearse a production migration;
+- apply a candidate runtime or library upgrade;
+- test a mutation against production-like state;
+- explore a counterfactual configuration;
+- discover consequences of a proposed restoration, migration, or change.
+
+Dreaming is not merely another name for testing or CI.
+
+Its architectural property is stronger: the proposed world is actually inhabited as a bounded child Thicket with its own Demiurge and lifecycle.
+
+A dream may produce observations, Shadows, remains, Divinations, or other grounds.
+
+Those grounds do not automatically escape into the waking Thicket.
+
+The waking world must still decide what may cross its boundary, what becomes Truth, what warrants consequence, and what should remain only a possibility.
+
+A dream is therefore a bounded child Thicket in which a possible world may be lived before its consequences are admitted into the waking Thicket.
 
 ---
+
+
+### Thicket Forms Are Not a Closed Taxonomy
+
+The Canon may name useful forms such as Dream Thicket or Warrior Thicket without turning them into permanent species.
+
+Many visible differences between Thickets may instead belong to Posture, Telos, relation, lifecycle phase, or specialized role.
+
+A Dream may later become staging or production.
+
+A child may be re-born into an autonomous relation.
+
+A Thicket may begin cultivating children.
+
+A defensive function may become hotter or colder.
+
+A temporary world may be promoted rather than recreated.
+
+Living differences should not become identity-bearing kinds unless a genuine identity distinction requires it.
+
+The Canon should therefore provide criteria for recognizing meaningful Thicket boundaries rather than an exhaustive catalogue of Thicket types.
+
+An arrangement concerned with identity, access, doors, grants, or warrants does not become a distinct kind of Thicket merely because those concerns are concentrated there.
+
+Locker-like behavior is first a role arrangement inside a jurisdiction.
+
+Only the ordinary Thicket boundary tests can justify a separate world.
+
 
 ## Fog — Provisional Carrier Concept
 
@@ -1984,7 +2554,7 @@ TWM separates domain truth from operative truth.
 
 Domain truth describes what the Field means.
 
-It includes beneficiaries, todos, tracks, notes, decisions, consequences, domain states, domain relations, and benefit-relevant facts.
+It includes tenants, todos, tracks, notes, decisions, consequences, domain states, domain relations, and benefit-relevant facts.
 
 Operative truth describes how a role participates.
 
@@ -2067,6 +2637,18 @@ The Tree therefore guards the domain not only by storing truth, but by shaping a
 The Tree does not perform mundane work.
 
 It does not render interfaces, manage browsers, handle public traffic, negotiate with the outside world, or become an application surface.
+
+The Tree is also not an integration surface exposed to newcomers.
+
+A newly arrived Symbiont does not negotiate raw Tree structure for itself.
+
+Internal Symbionts may lawfully inspect existing Truth, discover possible relationships, propose mappings, or identify adaptations needed for habitation.
+
+Those proposals remain proposals.
+
+Tree changes, new Shadows, new Intents, new fact relations, and new authoritative transitions remain subject to the Thicket’s existing authority and lifecycle.
+
+Historical Truth may acquire new lawful interpretation or relationship without being rewritten merely to satisfy a newcomer.
 
 The Tree works only through precise internal craft:
 
@@ -2309,6 +2891,15 @@ A one-second tracking tick becomes meaningful only when it forms a unit of lived
 
 A two-second healthcheck pulse becomes meaningful only when repeated missed beats turn silence into suspicion, peer-death, intervention, or rebirth.
 
+Liveness evidence must fit scale, season, and expected Posture.
+
+Silence is not failure when the current work is legitimately quiet, blocked in a long compilation, sleeping, hibernating, or otherwise outside the rhythm for which a heartbeat was designed.
+
+A health signal should therefore express an expectation appropriate to the current lifecycle and metabolic activity, not impose one universal pulse on every inhabitant.
+
+Time budgets for restart, compilation, shutdown, and recovery are contextual observations; their meaning comes from the consequence they threaten or preserve.
+
+
 The Janet event loop carries awakenings.
 
 The Thicket decides what awakening means.
@@ -2319,9 +2910,37 @@ An Observation Quantum decides when the answer has changed.
 
 Timers provide rhythm, but perception begins where rhythm becomes meaningful difference.
 
+Observation should be metabolically local by default.
+
+Perception should be filtered, reduced, and interpreted as close to its source as practical.
+
+Cheap local perception should absorb ordinary noise.
+
+Only surviving signal should recruit more expensive epistemic attention.
+
+Greater knowing should be purchased only when lesser knowing becomes insufficient.
+
+This does not introduce a separate observability subsystem.
+
+It reinforces the existing ecology: local perception shapes signals; Augurs cultivate expectations from surviving evidence; Temperature may reveal unresolved consequential uncertainty; Oracles awaken only when cheaper cognition no longer meets the epistemic burden.
+
+Locality of perception does not make local observation Truth.
+
+Observation remains observation until the appropriate authority accepts what may become canonical.
+
 ## Distributed Intelligence, Rational Symbionts, and Avatar Intellect
 
 No single component is the whole intelligence of a Thicket.
+
+The machine itself should increasingly be understood as a field of specialized metabolisms rather than one homogeneous processor.
+
+General reasoning, tensor inference, cheap prediction, perception, real-time control, signal processing, indexing, simulation, reconstruction, and other forms of work need not inhabit the same execution machinery.
+
+Hardware heterogeneity must not leak upward into TWM ontology.
+
+A Symbiont should not care whether a lawful consequence is executed through ordinary scalar code, vector machinery, tensor engines, programmable logic, adaptive hardware, or future custom extensions.
+
+Hardware acceleration is nourishment exposed through Capabilities, not a new ontological category.
 
 A living Thicket may contain different kinds of lawful participation:
 
@@ -2514,6 +3133,10 @@ The Oracle speaks.
 
 The Augur determines how much the speech means.
 
+Greater knowing should be purchased only when lesser knowing becomes insufficient.
+
+Ordinary uncertainty should therefore remain with cheap local perception and Augury where possible; Oracle involvement is justified when the surviving signal and epistemic burden warrant the additional metabolic cost.
+
 #### Large neural networks
 
 A large neural network is one powerful Oracle among others.
@@ -2594,9 +3217,51 @@ These roles must not collapse into a generic AI subsystem.
 
 ---
 
+### Cross-Thicket Epistemic Status
+
+Cross-Thicket Truth requires declared relation, not implicit shared state.
+
+Conceptually:
+
+```text
+Thicket A
+  local Truth / observation / warrant
+    ↓
+  lawful shaping for crossing
+    ↓
+Membrane
+    ↓
+Thicket B
+  receives grounds
+    ↓
+  interpretation / prediction where needed
+    ↓
+  consequence-relative epistemic evaluation
+    ↓
+  local Truth transition or refusal
+```
+
+This is not a mandatory runtime sequence for every crossing.
+
+Its law is simpler:
+
+> Authority does not cross merely because information crosses.
+
+A Yarlyk can travel farther than the local interpretation that produced it, but not farther than its own claim, provenance, conditions, burden, and contemplated consequence lawfully permit.
+
+A receiving Thicket may recognize the warrant according to declared relation. It must not silently inherit foreign canonical authority.
+
 ## Baskak and Yarlyk — Provisional Epistemic Warranting
 
 Baskak is a provisional Symbiont role.
+
+Baskak must not be confused with mechanical invariants of the Living Place.
+
+A substrate may make some crossings, Capability uses, or consequences structurally impossible.
+
+That substrate does not evaluate grounds, confidence, provenance, or epistemic burden.
+
+Baskak still determines whether the available grounds are sufficient for a requested consequence among the consequences that remain possible.
 
 Baskak inhabits the epistemic seam between interpretation and Capability exercise.
 
@@ -2607,6 +3272,15 @@ Baskak does not divine uncertainty.
 Baskak does not guard identity.
 
 Baskak does not authorize actors.
+
+Baskak may nevertheless warrant a claim whose subject is identity, such as that sufficient grounds establish that an Avatar was authenticated.
+
+The Sentry still guards the crossing and performs the authentication relation.
+
+Tree still preserves whatever authentication or identity facts become canonical.
+
+Baskak warrants the consequence-relative sufficiency of the grounds; it does not become the identity guard.
+
 
 Baskak does not exercise Capabilities.
 
@@ -2624,6 +3298,16 @@ The grounds may arise from the living intelligence of the Thicket:
 Baskak evaluates the resulting epistemic claim against the burden appropriate to the requested consequence.
 
 If the burden is satisfied, Baskak may issue a Yarlyk.
+
+During habitation, internal assistants or other capable Symbionts may discover candidate mappings, interpret existing information, identify conflicts, and propose Tree adaptations or Capabilities.
+
+Baskak may evaluate whether the available grounds are sufficient for such proposed consequences.
+
+A Yarlyk may warrant the proposal.
+
+It does not grant the Capability, alter Tree Truth, disclose information, or admit the newcomer to a wider SmallWorld.
+
+Epistemic sufficiency remains distinct from local authority and execution.
 
 A Yarlyk is not a Capability.
 
@@ -2646,6 +3330,51 @@ A Yarlyk may bind together:
 - optionally the target, Membrane, or consequence class.
 
 A Yarlyk must not justify a stronger consequence than the one for which it was issued.
+
+A Yarlyk's lifetime and the lifetime of the consequence it enabled are distinct.
+
+Expiry of a Yarlyk, or later withdrawal of its grounds or grant, does not by itself undo what was lawfully done under it.
+
+Undoing requires its own lawful relation and consequence.
+
+Each kind of warrant brings the obligations of the consequence it warrants.
+
+Those obligations belong to that warrant kind, not to Baskak or Yarlyk as such.
+
+A verifier must not treat an asserted issuer label as authoritative unless that claim is bound to the authority that actually verified the warrant.
+
+No particular token format, TTL, serialization, clock granularity, replay rule, or session policy is canonical merely because it belongs to one executable warrant kind.
+
+### Admission Warrant — First Praxis
+
+Admission across a Membrane is the first executable warrant kind presently demonstrated in Praxis.
+
+An admission warrant may justify a consequence such as opening a session or entering a guarded relation.
+
+Its obligations are specific to admission.
+
+They may include:
+
+- replay resistance;
+- signer and issuer binding;
+- validity checks appropriate to admission;
+- admission-specific consequence checks;
+- least privilege after admission;
+- session revocation;
+- cleanup;
+- origin and relation trust where relevant.
+
+Warrant lifetime and session lifetime are distinct in this kind.
+
+Expiry of the admission warrant does not by itself revoke an already established session unless the relation explicitly makes session life depend on continuing warrant validity.
+
+Removing an admission grant likewise does not automatically erase an already established session.
+
+These are obligations of admission Praxis, not the definition of Baskak or Yarlyk.
+
+Publication, Habitation, Telos evaluation, recoverability, and other warrant kinds may have different consequence-specific obligations and may not involve sessions, replay, or admission at all.
+
+
 
 There may be many Baskaks within a Thicket.
 
@@ -2685,6 +3414,13 @@ Oracle and Augur may be rich, generative, speculative, or uncertain.
 Baskak should remain small and strict where possible.
 
 Baskak is the keeper of consequence-relative epistemic sufficiency.
+
+A Baskak may expose a Shadow of its jurisdiction, such as which grants or warrantable relations are presently available.
+
+That does not make Baskak the Avatar's navigation authority, preference store, or universal directory.
+
+A preferred default destination is ordinarily a matter of Avatar/Sapling preference or Posture, not epistemic sufficiency.
+
 
 Yarlyk is the portable warrant that the epistemic burden for a particular consequence has been met.
 
@@ -2830,6 +3566,12 @@ Avatar carries Telos.
 
 Augur, Oracle, Baskak, Yarlyk, provenance, grounds, burden, and epistemic temperature are expected to acquire increasingly precise executable forms.
 
+Admission is currently the first executable Yarlyk kind.
+
+Publication, Habitation, Telos evaluation, recoverability, and other already-canonical warrant uses remain conceptually established but do not yet have equivalent executable forms.
+
+The first executable kind must not become the definition of Baskak or Yarlyk.
+
 Nolang is a promising affinity for formalizing parts of this seam, not a required foundation and not a replacement for TWM topology, identity, Capability, Mycelium, Membrane, or execution.
 
 Praxis must determine which epistemic distinctions earn machinery.
@@ -2841,6 +3583,13 @@ Praxis must determine which epistemic distinctions earn machinery.
 The following sections do not constitute a fourth domain beside Telos, Ontology, and Epistemy.
 
 They describe how TWM cultivates, tests, transmits, revises, canalises, and composts its own form.
+
+The first Praxis of a concept does not become its definition.
+
+An executable admission warrant does not define Yarlyk.
+
+A Locker-like arrangement does not define a species of Thicket.
+
 
 ---
 
@@ -3071,6 +3820,8 @@ It reproduces Panopticum logic when:
 - AI becomes an interpretive sovereign that ranks, predicts, or decides people without Avatar judgment.
 - Benefit is replaced by KPI extraction, engagement, productivity scoring, or administratively convenient metrics.
 - “Coordination” becomes a reason to dissolve boundary, consent, local authority, or refusal.
+- An access or warranting Thicket accumulates a durable map of who asked for which relations and turns ordinary movement into a central legibility asset.
+
 
 The test is not:
 
@@ -3169,11 +3920,11 @@ A mechanism passes the Oracle Containment Test when signs, generated material, c
 
 The seventeenth test is the Mycelium Participation Test.
 
-A mechanism passes the Mycelium Participation Test when all Symbionts remain rooted in the Mycelium and any outward relation is expressed as a Membrane crossing rather than a second kind of Symbiont life.
+A mechanism passes the Mycelium Participation Test when every native Symbiont remains rooted in its own Thicket's Mycelium and cross-Thicket participation remains a Membrane relation rather than being smuggled into a shared Mycelium.
 
 The eighteenth test is the Membrane Unity Test.
 
-A mechanism passes the Membrane Unity Test when routes, transports, listeners, and protocols are understood as crossings through one host Membrane, and when fundamentally different trust distances or capability boundaries are not hidden under one confused boundary.
+A mechanism passes the Membrane Unity Test when routes, transports, listeners, and protocols are understood as crossings through one host Membrane; when distinct trust ceremonies remain explicitly distinguishable; and when each concrete crossing retains a clear relation and session-owning authority rather than hiding several relations under one confused door.
 
 The nineteenth test is the Mimic Boundary Test.
 
@@ -3208,6 +3959,26 @@ The twenty-sixth test is the Living Context Test.
 
 A mechanism passes the Living Context Test when a derived artifact preserves provenance to the Canon and does not pretend to replace the full working context from which it was warranted.
 
+The twenty-seventh test is the Demiurge Locality Test.
+
+A mechanism passes the Demiurge Locality Test when one Demiurge tends one Thicket, local viability remains local, and coordination among several child worlds remains a concern of the parent Thicket rather than becoming global Demiurge authority.
+
+The twenty-eighth test is the Dream Boundary Test.
+
+A mechanism passes the Dream Boundary Test when rehearsal or counterfactual execution occurs in a genuinely bounded child Thicket with its own Demiurge and lifecycle, and when its consequences do not automatically escape into the waking Thicket.
+
+The twenty-ninth test is the Compute Nourishment Test.
+
+A mechanism passes the Compute Nourishment Test when richer execution resources expand lawful Capability or Posture without becoming identity, authority, or architectural center.
+
+The thirtieth test is the Hardware Specialization Test.
+
+A mechanism passes the Hardware Specialization Test when specialization follows observed metabolic pressure, remains behind stable Capabilities, and does not force Symbionts to depend on a particular execution substrate.
+
+The thirty-first test is the Habitation Sovereignty Test.
+
+A mechanism passes the Habitation Sovereignty Test when a newcomer may arrive, stabilize, orient, and deepen participation without importing authority over the receiving Information Field; when implementation movement, identity continuity, state movement, disclosure, epistemic warrant, Capability, and execution remain distinct; and when ongoing relationship change can occur through local authority without turning Tree into an integration surface.
+
 The metabolic constraint applies across all tests.
 
 A mechanism or flow is justified only when the life, truth, benefit, resilience, or continuity it preserves is worth the energy and complexity it consumes.
@@ -3238,7 +4009,97 @@ After consequence, can renewed perception contradict the organism's expectation,
 
 A Thicket that cannot be contradicted by reality has closed its own epistemic loop.
 
+### Identity / Posture / Observation Test
+
+Does the mechanism preserve the distinction between what a being is, how it presently stands, and what is presently known about it?
+
+Would a transient state or observation accidentally redefine identity?
+
+### Metabolic Observation Test
+
+Is ordinary noise reduced close to its source, with more expensive knowing recruited only when lesser knowing becomes insufficient?
+
+Does liveness evidence fit the current scale, season, and Posture rather than treating one universal heartbeat as proof of life?
+
+### Boundary Meaning Test
+
+Can communication become easier without making the semantic fact of crossing disappear?
+
+Does the design preserve lawful reachability rather than pretending to provide location transparency?
+
+Can several trust ceremonies inhabit one Membrane without confusing their relations, session ownership, or authority paths?
+
+### Habitat Invariant Test
+
+If a primitive protection belongs beneath interpreting Symbionts, is it enforced mechanically without pretending to make an epistemic judgment?
+
+Does Baskak remain responsible for consequence-relative sufficiency rather than substrate possibility?
+
+### Resurrection Evidence Test
+
+When recoverability is claimed, does the evidence distinguish between preserved backup material and demonstrated rebirth into a viable Thicket?
+
+Has a stronger claim earned stronger grounds?
+
+### Compute Nourishment Test
+
+Does additional local or remote compute become available as nourishment through stable Capabilities without turning that machine into the center of identity or authority?
+
+Can the organism become smaller again when that metabolism disappears without losing continuity?
+
+### Hardware Specialization Test
+
+Has a proposed acceleration been justified by observed long-lived metabolic pressure?
+
+Can the implementation move among scalar, vector, tensor, programmable, adaptive, or custom execution without changing TWM ontology?
+
+### Warrant Kind Test
+
+Does a statement about Baskak or Yarlyk hold for every kind of warrant, or only for the warrant kind whose Praxis pressed it into the Canon?
+
+Would applying the same obligation to publication, Habitation, Telos evaluation, recoverability, or another consequence still make sense?
+
+### Habitation Sovereignty Test
+
+Can a newcomer enter with a small lawful world, be observed, and deepen participation without receiving raw access to Tree or importing its own authority?
+
+Are declared requirements treated as proposals to the receiving Thicket rather than entitlements?
+
+Can existing Truth acquire new lawful relationships without unnecessary historical rewriting or modification of unrelated Symbionts?
+
+Are implementation movement, identity continuity, accumulated state, information disclosure, epistemic warrant, Capability, and execution kept distinct?
+
+Can habitation continue during ordinary life, while structural insufficiency still returns to proper lifecycle evolution rather than hidden mutation?
+
 ---
+
+
+### Thicket Boundary Test
+
+Does the proposed boundary correspond to a locally coherent jurisdiction of Benefit, Telos, canonical Truth, lifecycle, Information Field, and warranted consequence?
+
+Would a new Symbiont suffice instead?
+
+### Cross-Thicket Authority Test
+
+When information crosses between Thickets, does the receiving world preserve its own Truth authority and epistemic burden?
+
+Has foreign Truth, observation, or warrant been silently promoted into local canonical authority?
+
+### SmallWorld / Sovereignty Test
+
+Is a restricted participant merely receiving a lawful SmallWorld inside one Thicket, or is there genuinely a separate sovereign world?
+
+Does the design mistake scope for sovereignty?
+
+### Thicket Taxonomy Test
+
+Is a proposed Thicket kind genuinely identity-bearing, or could the difference be expressed more faithfully as Telos, Posture, relation, lifecycle phase, or specialized role?
+
+Does concentrating identity, access, grants, doors, or warrants in one place actually establish a new sovereign field, or only a role arrangement inside an existing jurisdiction?
+
+Locker-like concentration does not by itself define a kind of Thicket.
+
 
 ## Cheating Patterns
 
@@ -3254,7 +4115,15 @@ A concept cheats when projection becomes authority.
 
 A concept cheats when local state becomes canon.
 
+A concept cheats when transient Posture or present observation is allowed to redefine identity without an identity-bearing transition.
+
+A concept cheats when observation, Posture, and identity collapse into one undifferentiated state.
+
 A concept cheats when transport changes ontology silently.
+
+A concept cheats when easier transport is mistaken for boundaryless existence or location transparency.
+
+A concept cheats when a lawful gateway hides the semantic fact that a boundary was crossed.
 
 A concept cheats when Monster state becomes hidden truth.
 
@@ -3268,7 +4137,85 @@ A concept cheats when compost becomes canon without digestion.
 
 A concept cheats when nested topology becomes trust.
 
+A concept cheats when tenancy, namespace, deployment, user count, organization, or code layout is mistaken for a Thicket boundary.
+
+A concept cheats when a scoped SmallWorld is treated as proof of a separate sovereign Thicket.
+
+A concept cheats when a child Thicket is treated as a tenant with stronger isolation.
+
+A concept cheats when a parent Thicket is treated as a multitenant host or as the Tree of its children.
+
+A concept cheats when foreign Truth or Yarlyk crosses a Membrane and silently becomes local authority.
+
+A concept cheats when a useful Thicket form is hardened into permanent taxonomy without an identity-bearing distinction.
+
+A concept cheats when an arrangement that concentrates identity, access, grants, doors, or warrants is promoted to a kind of Thicket without passing the ordinary Thicket boundary tests.
+
+
+A concept cheats when a Demiurge becomes a global supervisor merely because Thickets are nested.
+
+A concept cheats when a parent Thicket reaches arbitrarily into a child world instead of relating through the child's lawful boundary and Demiurge.
+
+A concept cheats when a child Demiurge is called a parent-native Symbiont while remaining outside the parent's Mycelium.
+
+A concept cheats when sharing a host is treated as sharing a Thicket.
+
+A concept cheats when a grandparent bypasses an intervening Thicket and treats nested recursion as flattened reachability.
+
+A concept cheats when expiry or withdrawal of a warrant is assumed to undo the consequence it enabled without a separate lawful relation.
+
+In admission, a concept cheats when warrant expiry is assumed to revoke an established session without an explicit revocation relation.
+
+In admission, a concept cheats when removing a grant is assumed to erase already admitted authority or already disclosed information.
+
+A concept cheats when an asserted issuer name is trusted independently of the key or authority that actually verified the warrant.
+
+A concept cheats when the obligations of one warrant kind are read as the definition of Baskak or Yarlyk.
+
+A concept cheats when Baskak is reduced to access control because its first executable form is admission.
+
+A concept cheats when a Baskak becomes an Avatar preference store or navigation directory merely because it knows which grants exist.
+
+A concept cheats when presentation containment is described as sandboxing without execution isolation.
+
+
+A concept cheats when a child Demiurge decides parent-level priorities among sibling worlds.
+
+A concept cheats when a dream is reduced to an unbounded test process or when its consequences silently become waking consequences.
+
+A concept cheats when the existence of backup material is presented as proof of viable resurrection without sufficient grounds.
+
+A concept cheats when a particular processor, accelerator, model, memory topology, or vendor product becomes part of TWM ontology.
+
+A concept cheats when richer compute turns PocketThicket into a thin client whose continuity depends on a larger machine.
+
+A concept cheats when execution substrate is allowed to leak through stable Capability boundaries.
+
+A concept cheats when hardware specialization is designed speculatively before persistent metabolic need has been observed.
+
+A concept cheats when a powerful local or remote Oracle is mistaken for the Thicket itself.
+
 A concept cheats when implementation convenience becomes methodology.
+
+A concept cheats when deployment or artifact arrival is treated as operational membership.
+
+A concept cheats when operational membership is treated as automatic participation in the receiving Information Field.
+
+A concept cheats when a newcomer’s declared requirements become rights to local Truth or Capability.
+
+A concept cheats when Tree becomes a raw integration surface for newcomers.
+
+A concept cheats when stabilization is treated as proof of trustworthiness.
+
+A concept cheats when Capability revocation is treated as if already disclosed information had become unknown.
+
+A concept cheats when movement of code, identity, and accumulated state are treated as the same event.
+
+A concept cheats when habitation silently rewrites historical Truth merely because new interpretation has become useful.
+
+A concept cheats when every change in relationships requires a new development cycle even though existing lawful machinery can express the change.
+
+A concept cheats when “ongoing habitation” becomes an excuse for hidden schema mutation, authority bypass, or permanent architectural improvisation.
 
 A concept cheats when beneficiary is named but no property change is declared.
 
@@ -3356,7 +4303,9 @@ A concept cheats when internal coherence prevents the organism from encountering
 
 A concept cheats when the Flower is made coherent by hiding ambiguity that should remain visible.
 
-A concept cheats when Oracle is recruited before the cheap ecology of Augurs has reached its lawful limit.
+A concept cheats when Oracle is recruited before cheap local perception and the ecology of Augurs have reached their lawful limit.
+
+A concept cheats when raw observation is escalated before ordinary noise has been metabolized near its source.
 
 A concept cheats when Temperature is treated as generic utilization rather than consequential unresolved uncertainty relative to burden.
 
@@ -3391,6 +4340,8 @@ A concept cheats when Sentry mimics are treated as the same situated guard despi
 A concept cheats when a Yarlyk is treated as authorization.
 
 A concept cheats when Baskak performs the Capability it only warranted.
+
+A concept cheats when a mechanical habitat invariant is treated as Baskak judgment, or Baskak judgment is replaced by substrate possibility.
 
 A concept cheats when a Yarlyk justifies a stronger consequence than the one for which it was issued.
 
@@ -3431,11 +4382,35 @@ A Thicket may enter pacts with Panoptic systems, but may not be reduced to a Pan
 
 Demiurge owns lifecycle truth, not business truth.
 
+One Demiurge tends one Thicket.
+
+A Demiurge tends the conditions under which its Thicket can live.
+
+A child Thicket's Demiurge may participate as a Symbiont of its parent Thicket without surrendering the child's local boundary.
+
+Local viability belongs to the local Demiurge; coordination among child worlds belongs to the parent Thicket.
+
 One Thicket is bound to one host.
+
+Several Thickets may share one host without sharing a world.
+
+A child Thicket's Demiurge remains native to the child; its parent relation crosses a Membrane.
+
+Recursive reach is relayed through declared relations, not flattened across levels.
 
 No Mycelium leaves the host.
 
 Membranes are the only legal crossings.
+
+Seamless communication must not imply boundaryless existence.
+
+Mycelium may optimize communication within one Thicket; Membrane preserves the meaning and lawfulness of crossing between worlds.
+
+TWM seeks lawful reachability, not location transparency.
+
+A dream is a bounded temporary child Thicket; its consequences do not automatically become consequences of the waking Thicket.
+
+Primitive invariants may belong to the Living Place itself, but mechanical impossibility is not epistemic warrant.
 
 No raw authority crosses a Membrane.
 
@@ -3453,13 +4428,50 @@ A Shadow must not be used beyond its declared safety.
 
 A Capability is specified lawful power in context.
 
+Identity-bearing facts, Posture, and observation are distinct.
+
+What a being is, how it presently stands, and what is presently known about it must not collapse into one another.
+
+Transient facts must not accidentally become identity-bearing facts.
+
 Capabilities change Posture.
 
 Posture is the runtime shape of a Symbiont.
 
 Posture is not the sum of Capabilities.
 
-A Symbiont's state is its SmallWorld.
+A SmallWorld is the local state-world lawfully available to a Symbiont; it may contain identity-bearing facts, Posture, and observations without collapsing them.
+
+A SmallWorld scopes participation inside one Thicket; it does not by itself create sovereignty.
+
+Tenant is domain Truth where the domain needs it, not a TWM ontological primitive.
+
+A new role calls for a Symbiont; a new sovereign field may call for a Thicket.
+
+A Symbiont brings behavior; the receiving Thicket governs its habitation.
+
+Deployment, operational membership, information-field participation, and Capability are distinct.
+
+Tree is an internal authority, not a newcomer-facing integration surface.
+
+Stabilization is not trustworthiness.
+
+Information disclosure is not undone by Capability revocation.
+
+Implementation movement, identity continuity, and accumulated state movement are distinct.
+
+A Thicket may lawfully reorganize relationships among inhabitants during ordinary life.
+
+Existing Truth may acquire new lawful significance without being rewritten.
+
+Authority does not cross merely because information crosses.
+
+What is Truth there may arrive only as grounds here.
+
+A Thicket of Thickets is composition of local worlds, not one distributed organism pretending distance does not exist.
+
+A Locker-like arrangement is a role arrangement inside a jurisdiction, not a species of Thicket.
+
 
 The Information Field of the Thicket is its WholeWorld.
 
@@ -3533,13 +4545,17 @@ Oracles produce signs. Augurs cultivate expectations from signs and Shadows.
 
 An Oracle speaks. An Augur determines how much the speech means.
 
+Greater knowing should be purchased only when lesser knowing becomes insufficient.
+
+Observation should be metabolically local by default.
+
 A Divination must not become Truth without Tree acceptance.
 
 A large neural network is an Oracle, not sovereign authority.
 
 The larger and less interpretable an Oracle is, the deeper it should remain behind Capabilities, Shadows, Sentries, and Augurs.
 
-All Symbionts belong to the Mycelium, always.
+All native Symbionts of a Thicket belong to that Thicket's Mycelium.
 
 Mycelium-only does not mean less alive; it means no lawful outward crossing of its own.
 
@@ -3557,6 +4573,14 @@ Baskak warrants epistemic sufficiency; it does not grant Capability or perform c
 Yarlyk is a portable warrant that the epistemic burden for a particular consequence has been met.
 
 A Yarlyk must not justify a stronger consequence than the one for which it was issued.
+
+A Yarlyk's lifetime and the lifetime of the consequence it enabled are distinct.
+
+Undoing a consequence requires its own lawful relation.
+
+Each warrant kind carries the obligations of the consequence it warrants.
+
+In admission, revocation, replay resistance, signer binding, least privilege after admission, and cleanup remain explicit obligations.
 
 Interpretation, epistemic warrant, authority, Capability, execution, and outcome remain distinct.
 
@@ -3712,7 +4736,7 @@ TWM concepts should be mapped into OPM as stereotypes, patterns, or in-zoomed st
 | Symbiont | object stereotype / domain pattern | Executable participant with lifecycle states and processes |
 | Demiurge | lifecycle authority stereotype | Object or agent-like object with lifecycle processes; not domain authority |
 | Avatar | human-facing symbiont stereotype | Mediates perception, intention, Saplings, and action |
-| Cosymbiont | specialization of Avatar-like symbiont | Scope-bound participant |
+| Cosymbiont | specialization of Avatar-like Symbiont | scoped participant operating from deliberately restricted domain and operative context |
 | Sapling | local working object/state | Non-canonical structured local truth |
 | Shadow | projection object | Derived, shaped, non-authoritative, use-scoped |
 | Fruit | produced state/object | May be canonical, precious, rebuildable, or defensive |
@@ -3816,6 +4840,69 @@ It must not hide authority from the system.
 ---
 
 ## Operational Appendix G: Historical Revision Notes from Adversarial Clarification
+
+### November 2026 — Thicket of Thickets in Praxis
+
+Runtime work in `tots`, `locker`, and `twm` supplied evidence against several over-broad readings of the Canon.
+
+The strongest amendments are:
+
+- Mycelium membership is native to one Thicket. A child Demiurge remains native to the child even when it is the parent's lawful operational handle.
+- Several Thickets may share one host without sharing a world; one-host locality is not one-Thicket-per-machine exclusivity.
+- A Membrane may carry crossings with different trust ceremonies, provided each crossing keeps a clear relation, session owner, and authority path.
+- Living Place receives an explicit canonical home as stable local operational place across sleep/wake and changing process bodies.
+- Nested recursion is relayed through declared relations; a grandparent does not acquire implicit reach into a grandchild.
+- Demiurge distinguishes accepted birth from local restoration of intended Posture.
+- Liveness evidence must fit scale, season, and Posture.
+- Some reconfiguration may be absorbed as Posture; changes to structural roots require renewed becoming. Failed becoming should preserve the last viable form where possible.
+- Baskak may warrant identity-related claims without becoming the identity guard, and may expose Shadows of jurisdiction without becoming a preference or navigation authority.
+- Locker-like concentration of identity, access, grants, doors, or warrants remains a role arrangement unless the ordinary Thicket boundary tests establish a genuinely separate sovereign world.
+
+- Admission Praxis demonstrated that warrant lifetime, session lifetime, grant lifetime, revocation, replay resistance, signer binding, least privilege, and cleanup remain distinct within the admission kind; these are not universal obligations of every Yarlyk.
+- Key custody is part of the authority map; topology alone does not prove cryptographic independence.
+- Presentation containment is not execution isolation.
+- Central access and warrant logs are subject to the Panopticum self-check.
+- Authored ToT declarations and observed child state witness Archetype versus observation at ecology scale.
+- Runtime removal of compensating armor reinforces the rule that compensation should name the fault it compensates for and should compost when that fault disappears.
+
+Runtime-specific TTLs, serialization formats, clock granularity, implementation names, and current cryptographic shortcuts remain Praxis rather than Canon.
+
+
+### 15 October 2026 — Symbiont Habitation
+
+- Made habitation an ordinary lifecycle and metabolic responsibility of a Thicket rather than a synonym for deployment or development.
+- Distinguished independent cultivation, arrival, stabilization, orientation, integration, and continued habitation without turning them into a mandatory state machine.
+- Clarified that deployment, operational membership, participation in the Information Field, Capability, epistemic warrant, and execution remain distinct.
+- Preserved Tree sovereignty: Tree is an internal authority, not a newcomer-facing integration surface; local assistants may propose relationships and adaptations, but local authority decides.
+- Clarified third-party habitation: declared requirements are proposals, stabilization is not trustworthiness, and disclosure cannot be undone merely by Capability revocation.
+- Distinguished movement of implementation, identity continuity, and accumulated state.
+- Canonized the ability of a Thicket to reorganize lawful relationships among inhabitants during normal operation, while returning structural insufficiency to the proper lifecycle of Archetype and Tree evolution.
+- Added habitation-specific tests, invariants, and cheating patterns without introducing a new role or subsystem.
+
+
+### 20 September 2026 — Thicket Boundary, Tenancy, and Cross-World Jurisdiction
+
+- Removed Tenant as an implicit TWM boundary primitive while preserving it as legitimate application-domain Truth where appropriate.
+- Clarified SmallWorld as the normal mechanism for scoped participation inside one Thicket.
+- Added a careful distinction between creating a new Symbiont for a new role and creating a new Thicket for a new sovereign local field.
+- Deepened Thicket as a coherent jurisdiction across Telos, Ontology, and Epistemy without replacing the existing primary definition.
+- Clarified that crossing a Thicket boundary changes epistemic context: authority does not cross merely because information crosses.
+- Strengthened nested Thickets as composition of local worlds; parent Truth about a child remains distinct from the child's own Truth.
+- Removed tenancy as a necessary basis for Cosymbiont scoping.
+- Added guidance against premature taxonomy of Thicket forms and against treating personhood, tenancy, topology, or deployment as sufficient boundary criteria.
+
+
+### 8 September 2026 — Hardware Physiology and Compute Fields
+
+- Clarified that TWM should not begin with a bespoke processor; standard RISC-V plus measured specialization is the healthier long-term direction.
+- Added OpenHW / CORE-V and PULP as possible hardware lineage affinities rather than dependencies.
+- Canonized heterogeneous local compute as a compute field of specialized metabolisms behind stable Capabilities.
+- Clarified that powerful local machines are compute organs of a Thicket, not the Thicket itself and not “the AI.”
+- Strengthened PocketThicket as an autonomous continuity-bearing organism that may borrow richer nearby metabolism without becoming a thin client.
+- Added the durable principles “Compute is nourishment, not a place,” “A Symbiont need not own its metabolism,” and “Intelligence does not have to fit inside the pocket; continuity does.”
+- Added evolutionary hardware specialization through observed software pressure → programmable/adaptive hardware → possible custom extensions.
+- Added hardware-specific tests and cheating patterns while avoiding product-level canonization.
+
 
 Historical section numbers in these notes predate the Telos–Ontology–Epistemy structural alignment.
 
