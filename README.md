@@ -102,7 +102,7 @@ And the ones they stand on:
 ## Entering from another Thicket
 
 A Thicket speaks to another only through its Membrane. An Avatar in one
-Thicket (an identity Thicket, say) enters a place guarded in another so:
+Thicket enters a place guarded in another so:
 
 1. Its Baskak warrants the crossing: the avatar's live session is the
    ground, and a grant in the Baskak's own configuration names the door and
@@ -124,6 +124,11 @@ The Yarlyk's validity is the Baskak's (`:yarlyk/ttl`, bounded by the door's
 `:door/yarlyk-max`), the session's lifetime the destination's, and the
 scope is the grant and the admit together. A guardian may also hold several
 identities (`:identities`), each its own entrance whose sessions it owns.
+
+Neither Thicket is of a special kind. The one people sign in to and cross
+from is an ordinary Thicket with its roles so arranged: a guardian keeping
+their identities, an Avatar for each and a Baskak warranting their
+crossings.
 
 ## Conventions
 
