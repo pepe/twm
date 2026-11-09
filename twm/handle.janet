@@ -270,7 +270,8 @@
   ```
   A Producer that keeps the view of `state` as the symbiont has it: it
   fetches the view whenever the topics it watches are sent, and when the
-  line breaks says so and connects again.
+  line breaks, or the symbiont cannot be reached at all, says so and
+  tries again.
   ```
   [state]
   (def {:config config :app app} state)
@@ -278,9 +279,12 @@
   (def ks (get app :keys topics))
   (producer
     (forever
-      (def client (connect config (+ await/secs 10)))
+      (var client nil)
       (try
         (do
+          # A symbiont out of reach fails the connect itself, and that is
+          # one more broken line, not the end of the session.
+          (set client (connect config (+ await/secs 10)))
           (def token (:handle/watch client topics))
           (produce (^status true) (^view (:handle/view client ks)))
           (forever
@@ -289,7 +293,7 @@
               (= :stand-down taken) (error "the symbiont stood down")
               (present? taken) (produce (^view (:handle/view client ks))))))
         ([err] (produce (^status false (string err)))))
-      (protect (:close client))
+      (if client (protect (:close client)))
       (ev/sleep 2))))
 
 (def- message/beat

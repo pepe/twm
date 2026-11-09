@@ -200,4 +200,34 @@
 (assert (nil? (handle/aside/width [] 200)) "nor when there is nothing aside")
 (end-suite)
 
+(start-suite :handle-follow)
+(def- follow (get-in (require "../twm/handle") ['follow :value]))
+(def far "localhost:45872")
+(def failed @[])
+# Drawing fails without a terminal, so only the rest is counted.
+(def state @{:config {:rpc far :name :handle :psk psk}
+             :app {:topics [:focused]} :view @{}})
+(def followed
+  (make-manager state (fn [_ err]
+                        (unless (and (tuple? err) (= :effect (err 0)))
+                          (array/push failed err)))))
+(:transact followed (make-watch (fn [&] (follow state))))
+(ev/go (fn [] (:await followed)))
+(ev/sleep 3)
+(assert (and (empty? failed) (false? (state :online)) (state :failure))
+        "a symbiont out of reach is told as offline, and the session lives")
+(def far-view @{:focused "Send the offer"})
+(setdyn :view far-view)
+(def far-manager (make-manager @{:view far-view}))
+(:transact far-manager (^rpc far handle/membrane/funcs psk :symbiont false))
+(ev/go (fn [] (:await far-manager)))
+(var waited 0)
+(while (and (not (state :online)) (< waited 15))
+  (ev/sleep 0.5)
+  (+= waited 0.5))
+(assert (and (empty? failed) (state :online)
+             (= "Send the offer" (get-in state [:view :focused])))
+        "and once it is there again, it is followed")
+(end-suite)
+
 (os/exit 0)
