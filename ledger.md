@@ -4,6 +4,8 @@ One entry per decision, newest last, except D-001, which says how this ledger is
 Status values: `proposed`, `accepted`, `superseded`, `withdrawn`.
 A decision of a dependent is named by repository and ID (`metabolon D-005`); it binds there, not here.
 
+D-002 to D-004 were extracted on 2026-11-20 from `README.md` and the history by Claude Opus 5.5, and confirmed by Josef the same day.
+
 | ID | Date | Decision | Decided by | Grounds / source | Status | Where |
 |---|---|---|---|---|---|---|
 | D-001 | 2026-11-20 | twm is governed on its own, not under tots: tots and its tenants depend on twm, and twm on none of them. Its rules restate what it shares with tots' instead of inheriting them | Josef (proposed by Claude) | the dependency runs one way; inheriting from a dependent would turn it | accepted | `AGENTS.md` |

@@ -23,7 +23,6 @@ Scripts are written in Janet.
 
 ## Dependents
 
-- A thicket's need enters twm as an option whose default keeps today's behaviour (D-005). A default changes only by a decision in this ledger.
 - A change made for a dependent refers to the dependent's decision: `Refs: metabolon D-005`.
 - `make-send-email` exists in twm and in gp, and interstudy resolves twm's. The two copies are kept identical and changed together.
 
