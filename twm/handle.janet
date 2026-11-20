@@ -499,6 +499,8 @@
     line `i` of the scrolled block submits, or nil when it does nothing,
   * `:mouse` -- false to leave the mouse to the terminal, to select
     with: nothing is clicked then, and the wheel is the terminal's,
+  * `:input?` -- false to begin out of the line, the dashboard having
+    the keys; the session begins in the line by default,
   * `:aside` -- `(fn [view])` returning lines to draw beside everything
     else, top to bottom, when the terminal is wide enough for both; the
     rest is then drawn in the columns left of them. Nothing of it is
@@ -537,7 +539,7 @@
     (def state @{:config config :app app :term term :leave leave
                  :view @{} :online false :message nil
                  :editor (tui/make-editor editor/opts)
-                 :input? true :scroll 0})
+                 :input? (get app :input? true) :scroll 0})
     (defn on-error [_ err]
       (match err
         [kind event fiber]
