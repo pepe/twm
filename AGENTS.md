@@ -17,6 +17,7 @@ Scripts are written in Janet.
 ## The Canon
 
 - `CANON.md` is the Canon, and it is the keeper's text. Do not edit it unless he asks.
+- The Canon is published with the library (D-002): every release tag carries its state. A change to it goes in a commit of its own, never mixed with code, so a release's diff tells the two apart.
 - Use the Canon's words. Code may not claim a concept the Canon lacks; a word it lacks is named as provisional.
 - When the code and the Canon disagree, say which looks outdated and ask; do not assume either is right.
 
