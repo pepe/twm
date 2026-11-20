@@ -12,3 +12,4 @@ D-002 to D-004 were extracted on 2026-11-20 from `README.md` and the history by 
 | D-002 | 2026-08-16 | The Canon is published with the library: it lives in this repository as `CANON.md`, and every release tag carries its state | Josef | `2c0f221` "Add current Canon" | accepted | `CANON.md` |
 | D-003 | 2026-10-01 | Development happens on sr.ht; GitHub is a mirror with issues and pull requests turned off; patches and reports go by mail | Josef | `README.md` | accepted | `f7e0398` |
 | D-004 | 2026-10-01 | twm is at 0.x, and its API may move between minor versions; a dependent pins a release tag | Josef | `README.md` | accepted | `f7e0398` |
+| D-006 | 2026-11-20 | Governance brings no business value of its own, so it is kept as smooth as possible: the keeper is not asked to commit, clean up or repeat what an assistant can do | Josef | conversation with Claude, 2026-11-20 | accepted | `ledger.md` |
