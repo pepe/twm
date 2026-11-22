@@ -153,12 +153,7 @@
 (press state {:key :char :text "$"} {:key :esc} {:key :char :text "i"} {:key :char :text "y"}
        {:key :enter})
 (assert (deep= ["y" nil] asked) "a quick key is forgotten once its line is left")
-(press state {:key :esc} {:key :char :text "i"} {:key :char :text "z"})
-(assert (and (not (indexed? (press state {:key :enter :shift true}))) (= "z\n" (line state)))
-        "Shift+Enter breaks a line Enter breaks")
-(assert (indexed? (press state {:key :ctrl-enter :shift true}))
-        "and Ctrl+Shift+Enter submits it")
-(press state {:key :char :text "b"} {:key :char :text "3"} {:key :alt-enter})
+(press state {:key :esc} {:key :char :text "b"} {:key :char :text "3"} {:key :alt-enter})
 (assert (and (state :input?) (= "/b3\n" (line state)))
         "Alt+Enter breaks a line Enter would submit")
 (press state {:key :esc})

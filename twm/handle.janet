@@ -534,9 +534,7 @@
 
   Ctrl+Enter submits the line, unless it is blank, and leaves it; Enter
   does so when `:submits?` says it does, and breaks the line otherwise;
-  Alt+Enter breaks it. Shift held with a key that submits means advance,
-  where the terminal tells Shift. Esc cancels the line: it is emptied
-  and left.
+  Alt+Enter breaks it. Esc cancels the line: it is emptied and left.
   Tab takes the focus to the choices, the first of them, and Tab again
   to the next; Space or Enter takes the picked one into the line, and
   Shift+Tab or Esc give the focus back to the line. Out of the line, `i`
