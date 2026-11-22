@@ -330,13 +330,17 @@
   ((state :leave) (state :term) 0))
 
 (def- editor/opts
-  "The live line: Enter or Ctrl+Enter submits it, Alt+Enter breaks it."
-  {:prompt "> " :submit [:enter :ctrl-enter] :newline [:alt-enter]})
+  ```
+  The live line: Ctrl+Enter submits it, Enter or Alt+Enter breaks it. The
+  handle submits it on Enter when the app says so, see `enter-submits?`.
+  ```
+  {:prompt "> " :submit [:ctrl-enter] :newline [:enter :alt-enter]})
 
 (defn- leave-line
   "Leaves the line, done or cancelled, for the dashboard to have the keys."
   [state]
-  (put state :input? false))
+  (put state :input? false)
+  (put state :quick nil))
 
 (defn- asked
   "The app's table `k` as it stands, asked of it when it is a function."
@@ -348,6 +352,15 @@
   "The line the quick key `text` begins, by the app's `:quick` as it stands."
   [state text]
   (get (asked state :quick) text))
+
+(defn- enter-submits?
+  ```
+  Whether Enter submits the line `text`, by the app's `:submits?`, asked
+  with the quick key that began the line; Enter submits every line of an
+  app that says nothing.
+  ```
+  [state text]
+  ((get-in state [:app :submits?] (fn [&] true)) text (state :quick)))
 
 (def- hold/secs
   "Seconds a quick key of the app's `:hold` is held before its line is submitted."
@@ -436,8 +449,10 @@
              (do (tui/editor/set ed "")
                (leave-line state)
                (set changed true))
-             (case (tui/editor/key ed k (get state :left cols))
-               # Enter submits a line that says anything, and the
+             (case (if (and (= key :enter) (enter-submits? state (tui/editor/text ed)))
+                     :submit
+                     (tui/editor/key ed k (get state :left cols)))
+               # A line that says anything is submitted, and the
                # dashboard has the keys again.
                :submit (when (present? (string/trim (tui/editor/text ed)))
                          (set submitted [(tui/editor/text ed) (truthy? (k :shift))])
@@ -445,14 +460,15 @@
                          (leave-line state))
                :changed (set changed true))))
          (and (= key :char) (quick-line state (k :text)))
-         # A quick key begins its line, and Enter alone submits it. One
-         # of `:hold` is followed, to be held.
+         # A quick key begins its line, which keeps the key for
+         # `:submits?`. One of `:hold` is followed, to be held.
          (do
            (def line (quick-line state (k :text)))
            (tui/editor/set ed line)
            (put state :hold (if (get (asked state :hold) (k :text))
                               @{:text (k :text) :line line :since now :last now}))
            (put state :input? true)
+           (put state :quick (k :text))
            (set changed true))
          (case [key (k :text)]
            [:char "q"] (quit state)
@@ -495,6 +511,10 @@
     doing,
   * `:hold` -- a table whose keys are quick keys that submit their line
     when held, or a function returning it, asked as `:quick` is,
+  * `:submits?` -- `(fn [text quick])` telling whether Enter submits the
+    line `text` or breaks it, asked at every Enter in the line; `quick`
+    is the text of the quick key that began the line, or nil. Enter
+    submits every line by default,
   * `:click` -- `(fn [view i])` returning the line a left click on the
     line `i` of the scrolled block submits, or nil when it does nothing,
   * `:mouse` -- false to leave the mouse to the terminal, to select
@@ -512,8 +532,11 @@
   `text` that the piece `col` of the line `row` leaves, as a button of
   the cloud does.
 
-  Enter or Ctrl+Enter submits the line, unless it is blank, and leaves
-  it; Alt+Enter breaks it. Esc cancels the line: it is emptied and left.
+  Ctrl+Enter submits the line, unless it is blank, and leaves it; Enter
+  does so when `:submits?` says it does, and breaks the line otherwise;
+  Alt+Enter breaks it. Shift held with a key that submits means advance,
+  where the terminal tells Shift. Esc cancels the line: it is emptied
+  and left.
   Tab takes the focus to the choices, the first of them, and Tab again
   to the next; Space or Enter takes the picked one into the line, and
   Shift+Tab or Esc give the focus back to the line. Out of the line, `i`
