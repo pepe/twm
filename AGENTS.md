@@ -1,7 +1,7 @@
 # Working rules for AI participants
 
-twm keeps its own ledger, and follows the working rules of tots' `AGENTS.md` at the tag `governance-3`, apart from its sections on the box and on its secrets (D-009):
-`git -C ~/code/tots show governance-3:AGENTS.md`, or https://git.sr.ht/~pepe/tots/tree/governance-3/item/AGENTS.md.
+twm keeps its own ledger, and follows the working rules of tots' `AGENTS.md` at the tag `governance-4`, apart from its sections on the box and on its secrets (D-009):
+`git -C ~/code/tots show governance-4:AGENTS.md`, or https://git.sr.ht/~pepe/tots/tree/governance-4/item/AGENTS.md.
 tots runs on twm, but rules are text: following them makes no dependency at run time. This file adds to them and never loosens them. If the two seem to conflict, ask the keeper.
 Claude Code reads this file through `CLAUDE.md`.
 
