@@ -97,7 +97,8 @@ And the ones they stand on:
   supplies, and issues a Yarlyk or says why not. It authorizes nothing.
 - `twm/door` — a guardian's second way in, its own RPC listener with the
   key of one relation. It verifies a Yarlyk, applies its own `:door/admits`,
-  publishes one more session of its place and returns it as a bearer.
+  publishes one more session of its place and returns it, for the Avatar
+  to post to the place's `/_door/open`.
 
 ## Entering from another Thicket
 
