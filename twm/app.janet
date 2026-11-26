@@ -396,156 +396,6 @@ dynamics as set by *rpc-defines*.```
       (when-let [view (space :view)] (readiness/settle view :ready)))
     (. "resume " (space :name))))
 
-(defn cors/headers
-  ```
-  What a place answers a request from `origin`, one of the origins it
-  lets in: that origin and no other, the headers an Avatar entering
-  through a door sends, and nothing about credentials, because no cookie
-  ever crosses -- the session travels as a bearer.
-  ```
-  [origin]
-  {"Access-Control-Allow-Origin" origin
-   "Access-Control-Allow-Headers" "Authorization, Content-Type, Datastar-Request"
-   "Access-Control-Allow-Methods" "GET, POST, OPTIONS"
-   "Access-Control-Max-Age" "600"
-   "Vary" "Origin"})
-
-(defn- cors/conn
-  ```
-  Stands in for `conn` so the CORS `lines` reach the head of a response
-  that writes its own.
-
-  A stream writes its head straight to its connection, so the only way to
-  add to it is to be the connection: the head ends with the first empty
-  line, and the lines go in just before it. Everything after passes
-  through untouched. `:write`, `:flush` and `:close` are asked of a
-  connection by the responses gp writes, as gp's own `sse-writer` relies
-  on, and `:read` by a live stream watching for its reader to go
-  (`view/stream`): without it, every stream through a door took its
-  reader for gone and ended after its first drawing.
-  ```
-  [conn lines]
-  (var pending true)
-  @{:write (fn cors-write [self s]
-             (if pending
-               (if-let [at (string/find "\r\n\r\n" s)]
-                 (do (set pending false)
-                     (:write conn (string (string/slice s 0 (+ at 2)) lines
-                                          (string/slice s (+ at 2)))))
-                 (if (= "\r\n" (string s))
-                   (do (set pending false)
-                       (:write conn (string lines s)))
-                   (:write conn s)))
-               (:write conn s))
-             self)
-    :read (fn cors-read [self & args] (:read conn ;args))
-    :flush (fn cors-flush [self] (:flush conn) self)
-    :close (fn cors-close [self] (:close conn) self)})
-
-(defn cors/wrap
-  ```
-  Lets the `origins` a place names fetch from it across origins.
-
-  An Avatar serves its Membrane from a host of its own and asks the place
-  it entered for `/content` and the actions inside it, with its session as
-  a bearer. The browser allows that only when the place says so: it asks
-  first with `OPTIONS`, and then reads the answer only if the place names
-  the Avatar's origin. A request from any other origin, or from none --
-  the place's own pages -- is answered exactly as before.
-
-  A request let in across origins is answered in a page that is not the
-  place's own, so every action it renders must name the place in full and
-  carry the bearer. It says so to whatever renders it by `:door/address`,
-  the place's `address`, which `ds/get` and `ds/post` read.
-  ```
-  [handler origins &opt address]
-  (def allowed (tabseq [o :in origins] o true))
-  (fn cors [req]
-    (def origin (get-in req [:headers "Origin"]))
-    # Said on every request, either way: one connection carries many, and
-    # a mark left from the last must not render the next.
-    (setdyn :door/address (if (get allowed origin) address))
-    (def headers (cors/headers origin))
-    (def lines (string/join (seq [[k v] :pairs headers] (string k ": " v "\r\n"))))
-    (cond
-      (not (get allowed origin)) (handler req)
-      (= "OPTIONS" (req :method)) (http/response 204 "" headers)
-      (let [res (handler req)]
-        # A handler answers with rendered bytes, or with a function that
-        # writes its own head to the connection -- a stream.
-        (cond
-          (function? res)
-          (fn cors-response [conn] (res (cors/conn conn lines)))
-          (bytes? res)
-          (if-let [at (string/find "\r\n\r\n" res)]
-            (string (string/slice res 0 (+ at 2)) lines (string/slice res (+ at 2)))
-            res)
-          res)))))
-
-(def- door/css-grammar
-  ```
-  What `door/scope-css` rewrites: `:root`, and `html` or `body` standing
-  as a selector, become `:scope`. A word is a selector here when what
-  follows can only follow one -- a class, a pseudo-class, a combinator, a
-  list, a block -- so a declaration that happens to say `body;` stays as
-  it is. Comments are passed over whole.
-  ```
-  (peg/compile
-    ~{:comment (* "/*" (thru "*/"))
-      :before (+ (> -1 (set " \t\r\n,{}>+~(")) (! (> -1 1)))
-      :after (> 0 (set " \t\r\n.:#[,>+~){"))
-      :root (/ ":root" ":scope")
-      :element (* :before (/ (+ "html" "body") ":scope") :after)
-      :main (% (any (+ (<- :comment) :root :element (<- 1))))}))
-
-(defn door/scope-css
-  ```
-  A place's stylesheet `css`, made to style only what lands in an Avatar's
-  door: wrapped in `@scope (#door)`, with the document's own roots --
-  `:root`, `html`, `body` -- read as the door itself. Shown through a door,
-  a place's page is a part of the Avatar's, and a rule for the whole
-  document would restyle the Avatar around it.
-  ```
-  [css]
-  (string "@scope (#door) {\n" (first (peg/match door/css-grammar css)) "\n}\n"))
-
-(def- door/sheets
-  "The door's stylesheets read so far, by public folder and sheets."
-  @{})
-
-(defn door/css
-  ```
-  The stylesheets `space` names as `:door/css`, read from its `:public`
-  folder and scoped to the door, or nil when it names none.
-
-  They are read once: they change only with a release, and a release
-  raises the server again. A place running sandboxed without `:fs` reads
-  them before the sandbox closes, by asking for them first.
-  ```
-  [space]
-  (when-let [sheets (space :door/css)
-             public (space :public)]
-    (def at (string/join [public ;sheets] "\n"))
-    (unless (door/sheets at)
-      (put door/sheets at
-           (string/join (seq [s :in sheets]
-                          (door/scope-css (slurp (string public "/" s))))
-                        "\n")))
-    (door/sheets at)))
-
-(defn door/css-route
-  ```
-  The route serving a place's stylesheets as an Avatar's door wants them,
-  `/_door.css`, when its membrane names them as `:door/css`; none
-  otherwise. See `door/css`.
-  ```
-  [space]
-  (if-let [css (door/css space)]
-    {"/_door.css" (fn door-css [_]
-                    (http/success css {"Content-Type" "text/css; charset=utf-8"
-                                       "Cache-Control" "no-cache"}))}
-    {}))
-
 (def- door/token-grammar
   "A door's session as a form posts it: `token=` and 64 hex digits."
   (peg/compile ~(* "token=" (<- (repeat 64 :h)) (any (set "\r\n")) -1)))
@@ -559,18 +409,26 @@ dynamics as set by *rpc-defines*.```
   which a history, a log or a referrer would keep. It is answered with
   that session as the place's `session` cookie and sent to the place's
   root, so the window is the place's own page, signed in as a door
-  session is. Nothing is checked here: a cookie opens only what the
-  session it carries still opens, and a dead one leaves the window at
-  the guardian's form. The cookie is host-only, as a sign-in's is.
+  session is. The cookie is host-only, as a sign-in's is.
+
+  Only a post whose `Origin` is one of the `:origins` is taken: any other
+  page holding a live session could otherwise sign a browser in as its
+  holder. A post from elsewhere, from an origin the browser hid as
+  `null`, or with none, is sent to the place with no cookie, as a
+  malformed one is. The session is not checked here: a cookie opens only
+  what the session it carries still opens, and a dead one leaves the
+  window at the guardian's form.
   ```
   [space]
+  (def allowed (tabseq [o :in (get space :origins [])] o true))
   (if (present? (space :origins))
     {"/_door/open"
      (http/dispatch
        {"POST"
         (fn door-open [req]
           (def address (or (space :address) "/"))
-          (if-let [[token] (peg/match door/token-grammar (string (or (req :body) "")))]
+          (if-let [_ (get allowed (get-in req [:headers "Origin"]))
+                   [token] (peg/match door/token-grammar (string (or (req :body) "")))]
             (http/response 303 ""
                            (merge @{"Location" address "Content-Length" 0}
                                   (http/cookie "session"
@@ -578,19 +436,14 @@ dynamics as set by *rpc-defines*.```
             (http/see-other address)))})}
     {}))
 
-(defn ^space/http
+(defn space/handler
   ```
-  Producer running the HTTP server of one living `space`.
-
-  The space's view is bound inside the producer rather than around it,
-  because a dynamic binding belongs to the fiber that makes it and is
-  inherited by every connection the server accepts. That is what lets
-  one symbiont hold several spaces without their views meeting.
+  The handler answering a living `space`'s parsed requests: its routes,
+  its readiness, its `/_door/open` where it has one, its static files and
+  its journal.
   ```
   [space]
-  (def {:http http :log log? :name name :view view
-        :routes routes :public public :static static} space)
-  (assert http "HTTP host and port must be set, exiting.")
+  (def {:log log? :name name :routes routes :public public :static static} space)
   (assert (table? routes) "Routes must be table, exiting.")
   (if static (assert public "Public path must be set, exiting."))
   # The view is read when the request arrives, not when the server is built.
@@ -603,21 +456,29 @@ dynamics as set by *rpc-defines*.```
                                    (json/encode (readiness/status (space :view)))
                                    {"Content-Type" "application/json"
                                     "Cache-Control" "no-store"}))}
-                     (door/css-route space)
                      (door/open-route space)))
-  (def parser
-    (http/parser
-      (cond-> routes
-              # The space's own `:not-found` answers whatever is not a file,
-              # so a Membrane kept in that slot survives the static handler
-              # being put there. A space without one gets gp's plain 404.
-              static (put :not-found
-                          (http/static public nil (routes :not-found)))
-              true http/drive
-              # Its membrane names who may fetch from it across origins,
-              # and whoever holds the place answers them alike.
-              (present? (space :origins)) (cors/wrap (space :origins) (space :address))
-              log? (event-journal name))))
+  (cond-> routes
+          # The space's own `:not-found` answers whatever is not a file,
+          # so a Membrane kept in that slot survives the static handler
+          # being put there. A space without one gets gp's plain 404.
+          static (put :not-found
+                      (http/static public nil (routes :not-found)))
+          true http/drive
+          log? (event-journal name)))
+
+(defn ^space/http
+  ```
+  Producer running the HTTP server of one living `space`.
+
+  The space's view is bound inside the producer rather than around it,
+  because a dynamic binding belongs to the fiber that makes it and is
+  inherited by every connection the server accepts. That is what lets
+  one symbiont hold several spaces without their views meeting.
+  ```
+  [space]
+  (def {:http http :name name :view view} space)
+  (assert http "HTTP host and port must be set, exiting.")
+  (def parser (http/parser (space/handler space)))
   (make-watch
     (producer
       (space/dwell view)
@@ -1339,34 +1200,18 @@ dynamics as set by *rpc-defines*.```
   ```
   Constructs a Datastar action of `method` on the URL made of `parts`,
   with `options` -- the inside of the options object, as Datastar reads it,
-  `requestCancellation: el.stream` say -- or none. Rendered for an Avatar's
-  request, the bearer header joins them; see `ds/action`.
+  `requestCancellation: el.stream` say -- or none.
   ```
   [method options & parts]
-  (def address (dyn :door/address))
-  (def all
-    (filter present?
-            [options
-             (if address "headers: {Authorization: 'Bearer ' + $_bearer}")]))
-  # A URL a place built from its own address already names the place.
-  (def named? (string/find "://" (string (first parts))))
-  (string "@" method "('"
-          ;(if (and address (not named?))
-             [(if (string/has-suffix? "/" address) (slice address 0 -2) address)]
-             [])
-          ;parts "'"
-          ;(if (empty? all) [] [", {" (string/join all ", ") "}"])
+  (string "@" method "('" ;parts "'"
+          ;(if (present? options) [", {" options "}"] [])
           ")"))
 
 (defn ds/action
   ```
-  Constructs a Datastar action of `method` on the URL made of `parts`.
-
-  Rendered for a request an Avatar made across origins (`cors/wrap` says
-  so by `:door/address`), the action names the place in full and carries
-  the session as a bearer, read from the Avatar's local `$_bearer` signal
-  -- a signal whose name begins with an underscore is never sent. Rendered
-  for the place's own page, it is the root-relative action it always was.
+  Constructs a Datastar action of `method` on the URL made of `parts`,
+  as the place's own page asks it: root-relative, with the cookie the
+  browser sends by itself.
   ```
   [method & parts]
   (ds/action-with method nil ;parts))

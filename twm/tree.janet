@@ -64,8 +64,7 @@
 
   What is stored is either one session string, as a tree kept before a
   door could hold several, or the door's live tokens as kept by
-  `sessions/record`. Either way the capability admits the cookie, and the
-  tokens also as a bearer.
+  `sessions/record`. Either way the capability admits the cookie.
   ```
   [session]
   (if (dictionary? session)

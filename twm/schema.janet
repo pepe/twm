@@ -155,14 +155,10 @@
    :neighbors (?optional (>?? all peer?))
    :static (?optional boolean?)
    :public (?optional present-string?)
-   :origins (?optional (>?? all present-string?))
-   :door/css (?optional (>?? all present-string?))}
-  # A door-scoped sheet is read from the place's public folder.
-  (>if (=> :door/css present?)
-       (=> :public (>assert present-string?)))
+   :origins (?optional (>?? all present-string?))}
   (>if (=> :static true?)
        (=> :public (>assert present-string?)))
-  # What a place renders for another origin names the place in full.
+  # A place an Avatar opens sends the window on to its own address.
   (>if (=> :origins present?)
        (=> :address (>assert present-string?))))
 

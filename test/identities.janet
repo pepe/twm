@@ -103,9 +103,9 @@
 (assert (not (admits? :dan "matej-1")) "Matej's session does not open Dan's place")
 (assert (admits? :matej "matej-1"))
 (assert (not (admits? :matej "dan-1")))
-(assert ((get-in state [:spaces :dan :view :cap/session])
-          {:headers {"Authorization" (sentry/bearer "dan-2")}})
-        "a session is admitted as a bearer too")
+(assert (not ((get-in state [:spaces :dan :view :cap/session])
+               {:headers {"Authorization" "Bearer dan-2"}}))
+        "a session is admitted as its cookie only, never as a bearer")
 (:transact manager (^session/caps {:matej (tree/session/cap {})}))
 (:await manager)
 (assert (not (admits? :matej "matej-1")) "an owner's capability reaches its places")
@@ -133,7 +133,7 @@
 (def held (tree/session/cap @{"a" "locker/dan" "x" true}))
 (assert (= "locker/dan" (held {:headers {"Cookie" {"session" "a"}}}))
         "an admitted session answers who holds it")
-(assert (= "locker/dan" (held {:headers {"Authorization" "Bearer a"}})) "as a bearer too")
+(assert (false? (held {:headers {"Authorization" "Bearer a"}})) "but not as a bearer")
 (assert (= "locker/dan" (held {:headers {"Cookie" {"session" @["gone" "a"]}}}))
         "and as one of several cookies")
 (assert (true? (held {:headers {"Cookie" {"session" "x"}}})) "a holderless session answers true")
@@ -141,10 +141,11 @@
 (end-suite)
 
 (start-suite :sessions-presented)
-(assert (deep= @["t1" "t2" "b"]
+(assert (deep= @["t1" "t2"]
                (sentry/session/presented
                  {:headers {"Cookie" "a=1; session=t1; session=t2"
-                            "Authorization" "Bearer b"}})))
+                            "Authorization" "Bearer b"}}))
+        "the cookies, and no bearer beside them")
 (assert (deep= @["t"] (sentry/session/presented {:headers {"Cookie" {"session" "t"}}})))
 (assert (deep= @["t" "u"]
                (sentry/session/presented {:headers {"Cookie" {"session" @["t" "u"]}}})))
@@ -154,7 +155,7 @@
 (start-suite :register-tokens)
 (def registered
   (tree/register :peer @{"tok" "locker/dan"}))
-(assert (registered {:headers {"Authorization" "Bearer tok"}})
+(assert (registered {:headers {"Cookie" {"session" "tok"}}})
         "registering under live tokens answers a capability admitting them")
 (assert ((tree/register :peer "single") {:headers {"Cookie" {"session" "single"}}})
         "and under one session string as before")
