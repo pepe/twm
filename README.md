@@ -113,12 +113,12 @@ Thicket enters a place guarded in another so:
    relation's `:key`. The guardian checks it against `:door/issuers`, its
    own id and `:door/admits`, and answers `{:token :address}`.
 3. The token is one more live session of that place; nobody else's ends.
-   The Avatar serves its own Membrane on its own host and has the browser
-   fetch `/content` and the actions inside it from the place directly, with
-   `Authorization: Bearer <token>`. The place's membrane node lists the
-   Avatar's origin under `:origins`; `cors/wrap` answers those requests,
-   and `ds/get` and `ds/post` then render actions that name the place in
-   full and carry the bearer.
+   The Avatar opens the place in a window of its own: it has the browser
+   post the token to the place's `/_door/open`, which the place serves when
+   its membrane node lists the Avatar's origin under `:origins`, and which
+   takes a post from those origins only. The place answers with the token
+   as its own `session` cookie and sends the window to its `:address`, so
+   the place is its own page, never drawn into the Avatar's.
 
 The Yarlyk's validity is the Baskak's (`:yarlyk/ttl`, bounded by the door's
 `:door/yarlyk-max`), the session's lifetime the destination's, and the
