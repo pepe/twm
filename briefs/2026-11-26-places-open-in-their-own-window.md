@@ -52,3 +52,7 @@ These are the analyst's proposals for the planner to check against the code and 
 - Change only `twm/`, `test/` and `README.md`. Not `CANON.md`; not gp; not Locker, Present Star, Metabolon, Interstudy or tots.
 - No release or tag; no push unless the keeper asks.
 - Commits carry `Brief: briefs/2026-11-26-places-open-in-their-own-window.md`, `Drafted-by:` with the model and version, `Refs: locker D-003`, and this repository's ID once the keeper assigns it.
+
+## Note, 2026-11-26: the decision's ID
+
+The keeper assigned this repository's ID: D-012. Commits carry `Refs: D-012, locker D-003`.
