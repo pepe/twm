@@ -50,7 +50,8 @@ The five a Thicket is built from:
   (`^tree/refresh-view`), and mycelium navigations.
 - `twm/sentry` — the guardian. Shapes session Capabilities
   (`=>session/?eq`), gates requests on the bearer's cap (`check-session`,
-  `session/check-with`), handles `/logout` (303), navigates sentry
+  `session/check-with`), handles `/logout`, which acts only when asked
+  over Datastar and sends anything else (303) to the place, navigates sentry
   initial state.
 - `twm/demiurge` — the lifecycle authority. Births, supervises,
   heart-checks, restarts, builds, deploys, and releases Symbionts; runs
