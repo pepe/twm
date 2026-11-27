@@ -204,3 +204,46 @@
   (assert (deep= @["StandDown"] (names events)))
   (assert (< took 0.1) "with nobody watching it stands down at once"))
 (end-suite)
+
+(start-suite :logout)
+(defn logout-view
+  "A view answering `/logout`, a guardian's when `address` is given."
+  [&opt address]
+  (merge @{:name :pepe :owner :pepe-sentry :cap/session (fn [_] true)
+           :transition/logout ""}
+         (if address @{:space @{} :address address} @{})))
+
+(defn logging-out
+  "Asks `view` for `/logout` with `headers`, returning the answer and what it produced."
+  [view headers &opt query]
+  (as-symbiont view
+               |(sentry//logout @{:method "GET" :uri "/logout"
+                                  :query-string query :headers headers})))
+
+(defn sent-to
+  "Where a redirect `answer` sends the browser, or nil when it is none."
+  [answer]
+  (def answer (string answer))
+  (when (string/has-prefix? "HTTP/1.1 303" answer)
+    (def [location] (peg/match ~(* (thru "Location: ") '(to "\r\n")) answer))
+    location))
+
+(def cookie {"Cookie" "session=t"})
+(each [view home whose] [[(logout-view "https://dan.admin.example") "https://dan.admin.example/" "a guardian's"]
+                         [(logout-view) "./" "a symbiont's"]]
+  (each [headers query how]
+        [[cookie nil "presenting a session"]
+         [{} nil "presenting none"]
+         [cookie "datastar=%7B%7D" "carrying Datastar's query"]
+         [(merge cookie {"Datastar-Request" "1"}) nil "saying anything but true"]]
+    (def [answer events] (logging-out view headers query))
+    (assert (= home (sent-to answer))
+            (string "a logout not asked over Datastar, " how ", is sent to " whose " place"))
+    (assert (deep= @["log"] (names events))
+            (string "and changes nothing there, " how))))
+
+(let [[answer events] (logging-out (logout-view) {"Datastar-Request" "true"})]
+  (assert (nil? (sent-to answer)) "a logout asked over Datastar is answered, not sent away")
+  (assert (deep= @["log" "save session" "end sessions"] (names events))
+          "and closes the session and ends what it presents, as before"))
+(end-suite)

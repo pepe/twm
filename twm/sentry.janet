@@ -360,23 +360,15 @@
       (get jar "session")))
   @[;(cond (string? offered) [offered] (indexed? offered) offered [])])
 
-(defh /logout
+(defn- logout/act
   ```
-  Clears the current session.
-
-  A symbiont serving this from its own membrane stands down afterwards, so
-  its guardian takes the door back and asks for the secret again. A
-  guardian serving it is already the one who would take the door back, and
-  simply keeps standing.
+  Ends the sessions `presented` and answers with the logout transition,
+  standing a symbiont down once the answer is sent.
   ```
-  []
-  (define :view)
+  [view presented]
   (def done (ev/chan 1))
   (def sent (ev/chan 1))
   (def settled (logout/settled done))
-  # Only the sessions this request presents end: the door's others, held
-  # by someone else or elsewhere, stay live.
-  (def presented (session/presented req))
   (def owner (view :owner))
   (produce (log "logout-request name=" (view :name)
                  " guarded=" (truthy? (view :guards))
@@ -560,6 +552,46 @@
             (slice address 0 -2)
             address)
           path))
+
+(defn- logout/away
+  ```
+  Where a logout not asked over Datastar is sent: the place's own address.
+
+  A guardian's view says which place it answers for. A symbiont's view
+  carries no address, so it is told `./`, which the browser resolves
+  against the URL it asked -- the root for a place that is an origin of
+  its own, and the place's path for one of several sharing an origin.
+  ```
+  [view]
+  (if (view :address) (place/url "/" (view :address)) "./"))
+
+(defh /logout
+  ```
+  Clears the current session.
+
+  A symbiont serving this from its own membrane stands down afterwards, so
+  its guardian takes the door back and asks for the secret again. A
+  guardian serving it is already the one who would take the door back, and
+  simply keeps standing.
+
+  Only a page asks for it, over Datastar, which says so as
+  `Datastar-Request: true` -- a header no link, image or form from another
+  page can send. Any other request is sent to the place and changes
+  nothing: no session ends and nothing stands down, whether it presents a
+  session or not. It is the header that is read, not the `datastar` query
+  `navigations-only` goes by, because a link can carry a query.
+  ```
+  []
+  (define :view)
+  # Only the sessions this request presents end: the door's others, held
+  # by someone else or elsewhere, stay live.
+  (def presented (session/presented req))
+  (if (= "true" (get-in req [:headers "Datastar-Request"]))
+    (logout/act view presented)
+    (do
+      (produce (log (view :name) " turns a logout away, not asked over Datastar"
+                    " presented=" (length presented)))
+      (http/see-other (logout/away view)))))
 
 (defn <form/>
   ```
